@@ -1,0 +1,14 @@
+package pages
+
+import "rua.plus/cadmus/web/templates/layouts"
+
+templ HomePage(title string) {
+	@layouts.BaseLayout(title) {
+		@layouts.Header()
+		<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<h1 class="text-3xl font-bold text-gray-900 mb-4">欢迎来到 Cadmus</h1>
+			<p class="text-gray-600">一个现代化的多用户博客平台。</p>
+		</main>
+		@layouts.Footer()
+	}
+}

@@ -1,0 +1,62 @@
+package layouts
+
+templ BaseLayout(title string) {
+	<!DOCTYPE html>
+	<html lang="zh-CN">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/static/dist/main.css"/>
+		</head>
+		<body class="min-h-screen bg-gray-50">
+			{ children... }
+			<script src="/static/dist/main.js"></script>
+		</body>
+	</html>
+}
+
+templ Head(title string, description string) {
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<meta name="description" content={ description }/>
+		<title>{ title }</title>
+		<link rel="stylesheet" href="/static/dist/main.css"/>
+	</head>
+}
+
+templ Header() {
+	<header class="bg-white shadow-sm border-b border-gray-200">
+		<nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+			<div class="flex justify-between h-16">
+				<div class="flex items-center">
+					<a href="/" class="text-xl font-bold text-gray-900">
+						Cadmus
+					</a>
+				</div>
+				<div class="flex items-center space-x-4">
+					<a href="/" class="text-gray-600 hover:text-gray-900">首页</a>
+					<a href="/posts" class="text-gray-600 hover:text-gray-900">文章</a>
+					<a href="/about" class="text-gray-600 hover:text-gray-900">关于</a>
+				</div>
+			</div>
+		</nav>
+	</header>
+}
+
+templ Footer() {
+	<footer class="bg-white border-t border-gray-200 mt-auto">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div class="flex flex-col md:flex-row justify-between items-center">
+				<p class="text-gray-500 text-sm">
+					© 2026 Cadmus. Powered by Go + templ.
+				</p>
+				<div class="flex space-x-6 mt-4 md:mt-0">
+					<a href="/rss" class="text-gray-400 hover:text-gray-600">RSS</a>
+					<a href="/sitemap" class="text-gray-400 hover:text-gray-600">Sitemap</a>
+				</div>
+			</div>
+		</div>
+	</footer>
+}
