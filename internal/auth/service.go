@@ -3,42 +3,27 @@ package auth
 import (
 	"context"
 	"errors"
-	"time"
+
+	"rua.plus/cadmus/internal/core/user"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// User 用户信息（用于认证服务返回）
-type User struct {
-	ID           uuid.UUID
-	Username     string
-	Email        string
-	PasswordHash string
-	RoleID       uuid.UUID
-	Status       string
-}
-
-// UserStatus 用户状态常量
+// UserStatus 用户状态常量（从 user 包导出）
 const (
-	UserStatusActive  = "active"
-	UserStatusBanned  = "banned"
-	UserStatusPending = "pending"
+	UserStatusActive  = user.StatusActive
+	UserStatusBanned  = user.StatusBanned
+	UserStatusPending = user.StatusPending
 )
 
-// UserRepository 用户数据仓库接口
+// UserRepository 用户数据仓库接口（使用 user.User）
 type UserRepository interface {
-	GetByEmail(ctx context.Context, email string) (*User, error)
-	GetByUsername(ctx context.Context, username string) (*User, error)
-	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
-	Create(ctx context.Context, user *User) (*User, error)
-	Update(ctx context.Context, user *User) error
-}
-
-// TokenBlacklist token 黑名单接口（可选）
-type TokenBlacklist interface {
-	Add(ctx context.Context, token string, expiry time.Time) error
-	Exists(ctx context.Context, token string) bool
+	GetByEmail(ctx context.Context, email string) (*user.User, error)
+	GetByUsername(ctx context.Context, username string) (*user.User, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*user.User, error)
+	Create(ctx context.Context, user *user.User) error
+	Update(ctx context.Context, user *user.User) error
 }
 
 // AuthService 认证服务
@@ -65,7 +50,7 @@ func (s *AuthService) WithBlacklist(blacklist TokenBlacklist) *AuthService {
 // LoginResult 登录结果
 type LoginResult struct {
 	Token string
-	User  *User
+	User  *user.User
 }
 
 // Login 用户登录
@@ -87,7 +72,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 	}
 
 	// 生成 token
-	token, err := s.jwtService.Generate(user.ID, user.RoleID)
+	token, _, err := s.jwtService.Generate(user.ID, user.RoleID)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +84,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 }
 
 // Register 用户注册
-func (s *AuthService) Register(ctx context.Context, username, email, password string) (*User, error) {
+func (s *AuthService) Register(ctx context.Context, username, email, password string) (*user.User, error) {
 	// 检查邮箱是否已存在
 	if existing, _ := s.userRepo.GetByEmail(ctx, email); existing != nil {
 		return nil, errors.New("email already registered")
@@ -117,20 +102,19 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 	}
 
 	// 创建用户
-	user := &User{
+	newUser := &user.User{
 		ID:           uuid.New(),
 		Username:     username,
 		Email:        email,
 		PasswordHash: string(passwordHash),
-		Status:       UserStatusPending, // 默认待激活状态
+		Status:       user.StatusPending, // 默认待激活状态
 	}
 
-	createdUser, err := s.userRepo.Create(ctx, user)
-	if err != nil {
+	if err := s.userRepo.Create(ctx, newUser); err != nil {
 		return nil, err
 	}
 
-	return createdUser, nil
+	return newUser, nil
 }
 
 // Logout 用户登出（可选：加入黑名单）
@@ -139,15 +123,19 @@ func (s *AuthService) Logout(ctx context.Context, token string) error {
 		return nil // 无黑名单时直接返回
 	}
 
-	// 获取 token 过期时间
+	// 获取 token claims（包含 jti 和过期时间）
 	claims, err := s.jwtService.Validate(token)
 	if err != nil {
 		return err // token 无效，无需加入黑名单
 	}
 
-	// 将 token 加入黑名单
+	// 将 token jti 加入黑名单
+	jti := claims.GetJWTID()
+	if jti == "" {
+		return nil // 无 jti，无法加入黑名单
+	}
 	expiry := claims.ExpiresAt.Time
-	return s.blacklist.Add(ctx, token, expiry)
+	return s.blacklist.AddToBlacklist(ctx, jti, expiry)
 }
 
 // IsTokenBlacklisted 检查 token 是否在黑名单中
@@ -155,11 +143,23 @@ func (s *AuthService) IsTokenBlacklisted(ctx context.Context, token string) bool
 	if s.blacklist == nil {
 		return false
 	}
-	return s.blacklist.Exists(ctx, token)
+
+	// 获取 token jti
+	claims, err := s.jwtService.Validate(token)
+	if err != nil {
+		return false // token 无效，视为不在黑名单
+	}
+
+	jti := claims.GetJWTID()
+	if jti == "" {
+		return false // 无 jti，不在黑名单
+	}
+
+	return s.blacklist.IsBlacklisted(ctx, jti)
 }
 
 // ValidateToken 验证 token 并返回用户信息
-func (s *AuthService) ValidateToken(ctx context.Context, token string) (*Claims, *User, error) {
+func (s *AuthService) ValidateToken(ctx context.Context, token string) (*Claims, *user.User, error) {
 	// 检查黑名单
 	if s.IsTokenBlacklisted(ctx, token) {
 		return nil, nil, errors.New("token is blacklisted")

@@ -15,6 +15,14 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+// GetJWTID 获取 JWT ID (jti)
+func (c *Claims) GetJWTID() string {
+	if c.ID == "" {
+		return ""
+	}
+	return c.ID
+}
+
 // JWTService JWT 认证服务
 type JWTService struct {
 	Config JWTConfig
@@ -25,13 +33,16 @@ func NewJWTService(config JWTConfig) *JWTService {
 	return &JWTService{Config: config}
 }
 
-// Generate 生成 JWT token
-func (s *JWTService) Generate(userID, roleID uuid.UUID) (string, error) {
+// Generate 生成 JWT token，包含唯一 jti
+func (s *JWTService) Generate(userID, roleID uuid.UUID) (string, string, error) {
 	now := time.Now()
+	jti := uuid.New().String() // 生成唯一 JWT ID
+
 	claims := Claims{
 		UserID: userID,
 		RoleID: roleID,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti, // 设置 jti claim
 			Issuer:    s.Config.Issuer,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(s.Config.Expiry)),
@@ -40,7 +51,8 @@ func (s *JWTService) Generate(userID, roleID uuid.UUID) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(s.Config.Secret))
+	tokenString, err := token.SignedString([]byte(s.Config.Secret))
+	return tokenString, jti, err
 }
 
 // Validate 验证 JWT token 并返回 claims
@@ -65,10 +77,10 @@ func (s *JWTService) Validate(tokenString string) (*Claims, error) {
 }
 
 // Refresh 刷新 JWT token
-func (s *JWTService) Refresh(tokenString string) (string, error) {
+func (s *JWTService) Refresh(tokenString string) (string, string, error) {
 	claims, err := s.Validate(tokenString)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// 检查 token 是否在可刷新范围内
@@ -77,7 +89,7 @@ func (s *JWTService) Refresh(tokenString string) (string, error) {
 		// 允许在过期后 refresh_expiry 时间内刷新
 		expiryTime := claims.ExpiresAt.Time
 		if now.After(expiryTime.Add(s.Config.RefreshExpiry)) {
-			return "", errors.New("token refresh window expired")
+			return "", "", errors.New("token refresh window expired")
 		}
 	}
 

@@ -1,38 +1,38 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
 	"rua.plus/cadmus/internal/auth"
 	"rua.plus/cadmus/internal/core/user"
+	"rua.plus/cadmus/internal/services"
 )
 
 // AuthHandler 认证 API 处理器
 type AuthHandler struct {
-	authService *auth.AuthService
+	authService services.AuthService
+	userService services.UserService
 	jwtService  *auth.JWTService
-	userRepo    user.UserRepository
-	roleRepo    user.RoleRepository
+	roleRepo    user.RoleRepository // 保留用于获取角色信息
 }
 
 // NewAuthHandler 创建认证处理器
-func NewAuthHandler(authService *auth.AuthService, jwtService *auth.JWTService, userRepo user.UserRepository) *AuthHandler {
+func NewAuthHandler(authService services.AuthService, userService services.UserService, jwtService *auth.JWTService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
+		userService: userService,
 		jwtService:  jwtService,
-		userRepo:    userRepo,
 	}
 }
 
-// NewAuthHandlerWithRole 创建带角色仓库的认证处理器
-func NewAuthHandlerWithRole(authService *auth.AuthService, jwtService *auth.JWTService, userRepo user.UserRepository, roleRepo user.RoleRepository) *AuthHandler {
+// NewAuthHandlerWithServices 创建完整功能的认证处理器
+func NewAuthHandlerWithServices(authService services.AuthService, userService services.UserService, jwtService *auth.JWTService, roleRepo user.RoleRepository) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
+		userService: userService,
 		jwtService:  jwtService,
-		userRepo:    userRepo,
 		roleRepo:    roleRepo,
 	}
 }
@@ -82,30 +82,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 获取默认角色
+	// 调用 Service 层处理注册
 	ctx := r.Context()
-	defaultRole, err := h.getDefaultRole(ctx)
+	newUser, err := h.userService.Register(ctx, req.Username, req.Email, req.Password)
 	if err != nil {
-		WriteAPIError(w, "INTERNAL_ERROR", "获取默认角色失败", nil, http.StatusInternalServerError)
-		return
-	}
-
-	// 创建用户（密码哈希在 service 中处理）
-	newUser := &user.User{
-		ID:       uuid.New(),
-		Username: req.Username,
-		Email:    req.Email,
-		RoleID:   defaultRole.ID,
-		Status:   user.StatusPending,
-	}
-
-	// 哈希密码
-	if err := newUser.SetPassword(req.Password); err != nil {
-		WriteAPIError(w, "INTERNAL_ERROR", "密码处理失败", nil, http.StatusInternalServerError)
-		return
-	}
-
-	if err := h.userRepo.Create(ctx, newUser); err != nil {
 		if err == user.ErrUserAlreadyExists {
 			WriteAPIError(w, "USER_EXISTS", "用户已存在", nil, http.StatusConflict)
 			return
@@ -114,8 +94,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 生成 token
-	token, err := h.jwtService.Generate(newUser.ID, newUser.RoleID)
+	// 生成 token（忽略 jti，Handler 不需要）
+	token, _, err := h.jwtService.Generate(newUser.ID, newUser.RoleID)
 	if err != nil {
 		WriteAPIError(w, "INTERNAL_ERROR", "生成令牌失败", nil, http.StatusInternalServerError)
 		return
@@ -141,29 +121,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 调用 Service 层处理登录
 	ctx := r.Context()
-	u, err := h.userRepo.GetByEmail(ctx, req.Email)
+	token, u, err := h.authService.Login(ctx, req.Email, req.Password)
 	if err != nil {
+		if err.Error() == "user is banned" {
+			WriteAPIError(w, "USER_BANNED", "用户已被封禁", nil, http.StatusForbidden)
+			return
+		}
 		WriteAPIError(w, "AUTH_FAILED", "无效的凭证", nil, http.StatusUnauthorized)
-		return
-	}
-
-	// 验证密码
-	if !u.CheckPassword(req.Password) {
-		WriteAPIError(w, "AUTH_FAILED", "无效的凭证", nil, http.StatusUnauthorized)
-		return
-	}
-
-	// 检查用户状态
-	if u.Status == user.StatusBanned {
-		WriteAPIError(w, "USER_BANNED", "用户已被封禁", nil, http.StatusForbidden)
-		return
-	}
-
-	// 生成 token
-	token, err := h.jwtService.Generate(u.ID, u.RoleID)
-	if err != nil {
-		WriteAPIError(w, "INTERNAL_ERROR", "生成令牌失败", nil, http.StatusInternalServerError)
 		return
 	}
 
@@ -200,7 +166,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newToken, err := h.jwtService.Refresh(token)
+	newToken, _, err := h.jwtService.Refresh(token)
 	if err != nil {
 		WriteAPIError(w, "AUTH_FAILED", "令牌刷新失败", nil, http.StatusUnauthorized)
 		return
@@ -218,26 +184,13 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := h.userRepo.GetByID(r.Context(), userID)
+	u, err := h.userService.GetByID(r.Context(), userID)
 	if err != nil {
 		WriteAPIError(w, "USER_NOT_FOUND", "用户不存在", nil, http.StatusNotFound)
 		return
 	}
 
 	WriteJSON(w, toUserInfo(u), http.StatusOK)
-}
-
-// getDefaultRole 获取默认角色
-func (h *AuthHandler) getDefaultRole(_ context.Context) (*user.Role, error) {
-	// TODO: 需要注入 RoleRepository
-	// 暂时返回硬编码的普通用户角色 ID
-	// 实际应该从 role_repo.GetDefault(ctx) 获取
-	return &user.Role{
-		ID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-		Name:        "user",
-		DisplayName: "普通用户",
-		IsDefault:   true,
-	}, nil
 }
 
 // toUserInfo 转换 User 到 UserInfo

@@ -44,6 +44,38 @@ func AuthMiddleware(jwtService *auth.JWTService) func(http.Handler) http.Handler
 	}
 }
 
+// AuthMiddlewareWithBlacklist JWT 认证中间件（带黑名单检查）
+func AuthMiddlewareWithBlacklist(jwtService *auth.JWTService, blacklist auth.TokenBlacklist) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			token := ExtractToken(r)
+			if token == "" {
+				WriteAPIError(w, "AUTH_FAILED", "未授权访问", nil, http.StatusUnauthorized)
+				return
+			}
+
+			claims, err := jwtService.Validate(token)
+			if err != nil {
+				WriteAPIError(w, "AUTH_FAILED", "无效的令牌", nil, http.StatusUnauthorized)
+				return
+			}
+
+			// 检查黑名单（使用 jti）
+			ctx := r.Context()
+			jti := claims.GetJWTID()
+			if jti != "" && blacklist.IsBlacklisted(ctx, jti) {
+				WriteAPIError(w, "TOKEN_REVOKED", "令牌已被撤销", nil, http.StatusUnauthorized)
+				return
+			}
+
+			// 使用类型安全的 context key
+			ctx = context.WithValue(ctx, ctxUserID, claims.UserID)
+			ctx = context.WithValue(ctx, ctxUserRole, claims.RoleID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 // GetUserID 从 context 获取用户 ID
 func GetUserID(ctx context.Context) (uuid.UUID, error) {
 	id, ok := ctx.Value(ctxUserID).(uuid.UUID)
@@ -62,7 +94,7 @@ func GetUserRoleID(ctx context.Context) (uuid.UUID, error) {
 	return id, nil
 }
 
-// PermissionMiddleware 权限检查中间件
+// PermissionMiddleware 权限检查中间件（直接查库）
 func PermissionMiddleware(jwtService *auth.JWTService, permRepo user.PermissionRepository, requiredPerm string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -82,6 +114,45 @@ func PermissionMiddleware(jwtService *auth.JWTService, permRepo user.PermissionR
 			// 检查权限
 			ctx := r.Context()
 			hasPerm, err := permRepo.CheckPermission(ctx, claims.RoleID, requiredPerm)
+			if err != nil {
+				WriteAPIError(w, "INTERNAL_ERROR", "权限检查失败", nil, http.StatusInternalServerError)
+				return
+			}
+
+			if !hasPerm {
+				WriteAPIError(w, "PERMISSION_DENIED", "权限不足", nil, http.StatusForbidden)
+				return
+			}
+
+			// 设置 context
+			ctx = context.WithValue(ctx, ctxUserID, claims.UserID)
+			ctx = context.WithValue(ctx, ctxUserRole, claims.RoleID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// CachedPermissionMiddleware 权限检查中间件（带缓存）
+// 命中缓存直接返回，未命中查库并缓存
+func CachedPermissionMiddleware(jwtService *auth.JWTService, permCache *auth.PermissionCache, requiredPerm string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// 先验证认证
+			token := ExtractToken(r)
+			if token == "" {
+				WriteAPIError(w, "AUTH_FAILED", "未授权访问", nil, http.StatusUnauthorized)
+				return
+			}
+
+			claims, err := jwtService.Validate(token)
+			if err != nil {
+				WriteAPIError(w, "AUTH_FAILED", "无效的令牌", nil, http.StatusUnauthorized)
+				return
+			}
+
+			// 使用缓存检查权限
+			ctx := r.Context()
+			hasPerm, err := permCache.GetPermission(ctx, claims.RoleID, requiredPerm)
 			if err != nil {
 				WriteAPIError(w, "INTERNAL_ERROR", "权限检查失败", nil, http.StatusInternalServerError)
 				return

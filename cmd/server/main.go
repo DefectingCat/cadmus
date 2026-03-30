@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
-	"github.com/google/uuid"
 	"rua.plus/cadmus/internal/api/handlers"
 	"rua.plus/cadmus/internal/auth"
+	"rua.plus/cadmus/internal/cache"
 	"rua.plus/cadmus/internal/database"
-	"rua.plus/cadmus/internal/core/user"
+	"rua.plus/cadmus/internal/services"
 	"rua.plus/cadmus/web/templates/pages"
 )
 
@@ -42,6 +42,23 @@ func main() {
 	defer pool.Close()
 	log.Println("Database connection pool initialized")
 
+	// 初始化 Redis 连接池
+	redisCfg := cache.DefaultConfig()
+	redisCfg.Host = getEnvOrDefault("REDIS_HOST", "localhost")
+	redisCfg.Port = atoi(getEnvOrDefault("REDIS_PORT", "6379"))
+	redisCfg.Password = getEnvOrDefault("REDIS_PASSWORD", "")
+
+	redisClient, err := cache.NewRedisClient(redisCfg)
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer redisClient.Close()
+	log.Println("Redis connection pool initialized")
+
+	// 初始化缓存服务（保留用于后续任务）
+	_ = cache.NewService(redisClient)
+	log.Println("Cache service initialized")
+
 	// 初始化 repositories
 	userRepo := database.NewUserRepository(pool)
 	roleRepo := database.NewRoleRepository(pool)
@@ -49,18 +66,28 @@ func main() {
 	log.Println("Repositories initialized")
 
 	// 初始化 JWT 服务
-	jwtCfg := auth.DefaultJWTConfig()
-	jwtCfg.Secret = getEnvOrDefault("JWT_SECRET", jwtCfg.Secret)
+	jwtCfg, err := auth.DefaultJWTConfig()
+	if err != nil {
+		log.Fatalf("JWT config error: %v", err)
+	}
 	jwtService := auth.NewJWTService(jwtCfg)
 	log.Println("JWT service initialized")
 
-	// 创建认证服务适配器（连接 database repository 和 auth service）
-	authUserRepo := &authUserRepoAdapter{userRepo: userRepo}
-	authService := auth.NewAuthService(jwtService, authUserRepo)
-	log.Println("Auth service initialized")
+	// 初始化 token 黑名单
+	tokenBlacklist := auth.NewRedisTokenBlacklist(redisClient)
+	log.Println("Token blacklist initialized")
 
-	// 初始化认证处理器
-	authHandler := handlers.NewAuthHandlerWithRole(authService, jwtService, userRepo, roleRepo)
+	// 初始化 Service 容器（带黑名单）
+	serviceContainer := services.NewContainerWithBlacklist(userRepo, roleRepo, jwtService, tokenBlacklist)
+	log.Println("Service container initialized")
+
+	// 初始化认证处理器（通过 Service 层）
+	authHandler := handlers.NewAuthHandlerWithServices(
+		serviceContainer.AuthService,
+		serviceContainer.UserService,
+		serviceContainer.JWTService(),
+		roleRepo,
+	)
 	log.Println("Auth handlers initialized")
 
 	// 创建路由
@@ -70,9 +97,9 @@ func main() {
 	// 认证 API
 	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
 	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
-	mux.HandleFunc("POST /api/v1/auth/logout", handlers.AuthMiddleware(jwtService)(http.HandlerFunc(authHandler.Logout)).ServeHTTP)
+	mux.HandleFunc("POST /api/v1/auth/logout", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(authHandler.Logout)).ServeHTTP)
 	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
-	mux.HandleFunc("GET /api/v1/auth/me", handlers.AuthMiddleware(jwtService)(http.HandlerFunc(authHandler.Me)).ServeHTTP)
+	mux.HandleFunc("GET /api/v1/auth/me", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(authHandler.Me)).ServeHTTP)
 
 	// 健康检查端点
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -138,86 +165,3 @@ func atoi(s string) int {
 	return n
 }
 
-// authUserRepoAdapter 适配 database.UserRepository 到 auth.UserRepository
-type authUserRepoAdapter struct {
-	userRepo *database.UserRepository
-}
-
-func (a *authUserRepoAdapter) GetByEmail(ctx context.Context, email string) (*auth.User, error) {
-	u, err := a.userRepo.GetByEmail(ctx, email)
-	if err != nil {
-		return nil, err
-	}
-	return &auth.User{
-		ID:           u.ID,
-		Username:     u.Username,
-		Email:        u.Email,
-		PasswordHash: u.PasswordHash,
-		RoleID:       u.RoleID,
-		Status:       string(u.Status),
-	}, nil
-}
-
-func (a *authUserRepoAdapter) GetByUsername(ctx context.Context, username string) (*auth.User, error) {
-	u, err := a.userRepo.GetByUsername(ctx, username)
-	if err != nil {
-		return nil, err
-	}
-	return &auth.User{
-		ID:           u.ID,
-		Username:     u.Username,
-		Email:        u.Email,
-		PasswordHash: u.PasswordHash,
-		RoleID:       u.RoleID,
-		Status:       string(u.Status),
-	}, nil
-}
-
-func (a *authUserRepoAdapter) GetByID(ctx context.Context, id uuid.UUID) (*auth.User, error) {
-	u, err := a.userRepo.GetByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return &auth.User{
-		ID:           u.ID,
-		Username:     u.Username,
-		Email:        u.Email,
-		PasswordHash: u.PasswordHash,
-		RoleID:       u.RoleID,
-		Status:       string(u.Status),
-	}, nil
-}
-
-func (a *authUserRepoAdapter) Create(ctx context.Context, u *auth.User) (*auth.User, error) {
-	coreUser := &user.User{
-		ID:           u.ID,
-		Username:     u.Username,
-		Email:        u.Email,
-		PasswordHash: u.PasswordHash,
-		RoleID:       u.RoleID,
-		Status:       user.UserStatus(u.Status),
-	}
-	if err := a.userRepo.Create(ctx, coreUser); err != nil {
-		return nil, err
-	}
-	return &auth.User{
-		ID:           coreUser.ID,
-		Username:     coreUser.Username,
-		Email:        coreUser.Email,
-		PasswordHash: coreUser.PasswordHash,
-		RoleID:       coreUser.RoleID,
-		Status:       string(coreUser.Status),
-	}, nil
-}
-
-func (a *authUserRepoAdapter) Update(ctx context.Context, u *auth.User) error {
-	coreUser := &user.User{
-		ID:           u.ID,
-		Username:     u.Username,
-		Email:        u.Email,
-		PasswordHash: u.PasswordHash,
-		RoleID:       u.RoleID,
-		Status:       user.UserStatus(u.Status),
-	}
-	return a.userRepo.Update(ctx, coreUser)
-}
