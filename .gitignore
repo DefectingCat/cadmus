@@ -21,8 +21,8 @@ vendor/
 # Build output
 bin/
 dist/
-server
-cadmus
+/server
+/cadmus
 
 # IDE/Editor
 .idea/
