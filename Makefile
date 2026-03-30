@@ -17,7 +17,7 @@ live/server:
 
 # esbuild bundle TypeScript
 live/esbuild:
-	cd web/frontend && npx esbuild src/main.ts \
+	cd web/frontend && bun esbuild src/main.ts \
 		--bundle \
 		--outdir=../static/dist \
 		--watch \
@@ -26,32 +26,32 @@ live/esbuild:
 
 # Tailwind CSS compilation
 live/tailwind:
-	cd web/frontend && npx @tailwindcss/cli \
+	cd web/frontend && bun @tailwindcss/cli \
 		-i src/styles/main.css \
 		-o ../static/dist/styles.css \
 		--watch
 
 # Production build
 build/frontend:
-	cd web/frontend && npx esbuild src/main.ts \
+	cd web/frontend && bun esbuild src/main.ts \
 		--bundle \
 		--outdir=../static/dist \
 		--minify \
 		--format=esm
-	cd web/frontend && npx @tailwindcss/cli \
+	cd web/frontend && bun @tailwindcss/cli \
 		-i src/styles/main.css \
 		-o ../static/dist/styles.css \
 		--minify
 
 # Editor entry point (separate bundle for editor pages)
 build/editor:
-	cd web/frontend && npx esbuild src/editor/index.ts \
+	cd web/frontend && bun esbuild src/editor/index.ts \
 		--bundle \
 		--outdir=../static/dist/editor.js \
 		--minify
 
 live/editor:
-	cd web/frontend && npx esbuild src/editor/index.ts \
+	cd web/frontend && bun esbuild src/editor/index.ts \
 		--bundle \
 		--outdir=../static/dist/editor.js \
 		--watch \
