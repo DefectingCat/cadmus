@@ -1,0 +1,183 @@
+package pages
+
+import (
+	"rua.plus/cadmus/internal/core/post"
+	"rua.plus/cadmus/internal/core/user"
+	"rua.plus/cadmus/web/templates/layouts"
+	"strings"
+)
+
+// PostDetailPage 文章详情页
+templ PostDetailPage(p *post.Post, author *user.User, tags []*post.Tag, relatedPosts []*post.Post) {
+	@layouts.BaseLayout(p.Title) {
+		@layouts.Header()
+		<main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<!-- 文章头部 -->
+			<header class="mb-8">
+				<!-- 特色图片 -->
+				if p.FeaturedImage != "" {
+					<div class="mb-6">
+						<img src={ p.FeaturedImage } alt={ p.Title } class="w-full h-64 object-cover rounded-lg"/>
+					</div>
+				}
+
+				<!-- 文章标题 -->
+				<h1 class="text-4xl font-bold text-gray-900 mb-4">{ p.Title }</h1>
+
+				<!-- 元信息 -->
+				<div class="flex flex-wrap items-center text-sm text-gray-500 gap-4 mb-4">
+					<!-- 作者 -->
+					if author != nil {
+						<div class="flex items-center">
+							if author.AvatarURL != "" {
+								<img src={ author.AvatarURL } alt={ author.Username } class="w-8 h-8 rounded-full mr-2"/>
+							}
+							<a href="/users/{ author.Username }" class="text-gray-700 hover:text-gray-900">
+								{ author.Username }
+							</a>
+						</div>
+					}
+
+					<!-- 发布日期 -->
+					<span>{ p.CreatedAt.Format("2006-01-02") }</span>
+
+					<!-- 阅读量 -->
+					<span>阅读 { p.ViewCount }</span>
+
+					<!-- 评论数 -->
+					<span>评论 { p.CommentCount }</span>
+
+					<!-- 文章状态 -->
+					if p.Status == post.StatusPublished {
+						<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+							已发布
+						</span>
+					} else if p.Status == post.StatusDraft {
+						<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+							草稿
+						</span>
+					}
+				</div>
+
+				<!-- 标签列表 -->
+				if len(tags) > 0 {
+					<div class="flex flex-wrap gap-2 mb-4">
+						for _, t := range tags {
+							<a href="/posts?tag={ t.ID.String() }" class="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200">
+								{ t.Name }
+							</a>
+						}
+					</div>
+				}
+			</header>
+
+			<!-- 文章内容 -->
+			<article class="bg-white rounded-lg shadow-sm p-8 mb-8">
+				<!-- 内容暂时直接显示 JSON -->
+				if len(p.Content) > 0 {
+					<div class="prose max-w-none">
+						<pre class="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
+							{ string(p.Content) }
+						</pre>
+					</div>
+				} else if p.ContentText != "" {
+					<div class="prose max-w-none">
+						{ p.ContentText }
+					</div>
+				} else {
+					<p class="text-gray-500">暂无内容</p>
+				}
+			</article>
+
+			<!-- 文章底部操作 -->
+			<div class="flex items-center justify-between mb-8">
+				<div class="flex items-center space-x-4">
+					<!-- 点赞 -->
+					<button class="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+						<span class="mr-2">♥</span>
+						<span>{ p.LikeCount }</span>
+					</button>
+
+					<!-- 分享 -->
+					<button class="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+						分享
+					</button>
+				</div>
+
+				<div class="flex items-center space-x-2 text-sm text-gray-500">
+					<span>版本 { p.Version }</span>
+					<span>更新于 { p.UpdatedAt.Format("2006-01-02") }</span>
+				</div>
+			</div>
+
+			<!-- 相关文章推荐 -->
+			if len(relatedPosts) > 0 {
+				<section class="mb-8">
+					<h2 class="text-2xl font-semibold text-gray-900 mb-4">相关文章</h2>
+					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+						for _, rp := range relatedPosts {
+							@RelatedPostCard(rp)
+						}
+					</div>
+				</section>
+			}
+
+			<!-- 付费信息 -->
+			if p.IsPaid {
+				<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+					<h3 class="text-lg font-semibold text-yellow-800 mb-2">付费内容</h3>
+					if p.Price != nil {
+						<p class="text-yellow-700">价格: ¥{ *p.Price }</p>
+					}
+					<button class="mt-4 px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
+						购买阅读
+					</button>
+				</div>
+			}
+		</main>
+		@layouts.Footer()
+	}
+}
+
+// RelatedPostCard 相关文章卡片
+templ RelatedPostCard(p *post.Post) {
+	<a href="/posts/{ p.Slug }" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
+		if p.FeaturedImage != "" {
+			<img src={ p.FeaturedImage } alt={ p.Title } class="w-full h-32 object-cover rounded-lg mb-3"/>
+		}
+		<h3 class="text-lg font-medium text-gray-900 mb-2 line-clamp-2">{ p.Title }</h3>
+		<div class="flex items-center text-sm text-gray-500 space-x-2">
+			<span>{ p.CreatedAt.Format("2006-01-02") }</span>
+			<span>阅读 { p.ViewCount }</span>
+		</div>
+	</a>
+}
+
+// PostMetaSEO SEO 元信息注入组件（用于在 Head 中添加额外 meta）
+templ PostMetaSEO(p *post.Post) {
+	<!-- SEO 元信息 -->
+	if p.SEOMeta.Title != "" {
+		<meta name="og:title" content={ p.SEOMeta.Title }/>
+	} else {
+		<meta name="og:title" content={ p.Title }/>
+	}
+
+	if p.SEOMeta.Description != "" {
+		<meta name="og:description" content={ p.SEOMeta.Description }/>
+		<meta name="description" content={ p.SEOMeta.Description }/>
+	} else if p.Excerpt != "" {
+		<meta name="og:description" content={ p.Excerpt }/>
+		<meta name="description" content={ p.Excerpt }/>
+	}
+
+	if p.FeaturedImage != "" {
+		<meta name="og:image" content={ p.FeaturedImage }/>
+	}
+
+	if len(p.SEOMeta.Keywords) > 0 {
+		<meta name="keywords" content={ strings.Join(p.SEOMeta.Keywords, ",") }/>
+	}
+
+	<meta name="og:type" content="article"/>
+	<meta name="og:url" content={ "/posts/" + p.Slug }/>
+}
