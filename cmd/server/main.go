@@ -69,6 +69,10 @@ func main() {
 	categoryRepo := database.NewCategoryRepository(pool)
 	tagRepo := database.NewTagRepository(pool)
 	seriesRepo := database.NewSeriesRepository(pool)
+
+	// 评论相关 repositories
+	commentRepo := database.NewCommentRepository(pool)
+	commentLikeRepo := database.NewCommentLikeRepository(pool)
 	log.Println("Repositories initialized")
 
 	// 初始化 JWT 服务
@@ -83,10 +87,11 @@ func main() {
 	tokenBlacklist := auth.NewRedisTokenBlacklist(redisClient)
 	log.Println("Token blacklist initialized")
 
-	// 初始化 Service 容器（带黑名单和文章服务）
-	serviceContainer := services.NewContainerWithPosts(
+	// 初始化 Service 容器（带评论服务）
+	serviceContainer := services.NewContainerWithComments(
 		userRepo, roleRepo, jwtService, tokenBlacklist,
 		postRepo, categoryRepo, tagRepo, seriesRepo,
+		commentRepo, commentLikeRepo,
 	)
 	log.Println("Service container initialized")
 
@@ -104,6 +109,10 @@ func main() {
 	categoryHandler := handlers.NewCategoryHandler(categoryRepo)
 	tagHandler := handlers.NewTagHandler(tagRepo)
 	log.Println("Post handlers initialized")
+
+	// 初始化评论处理器
+	commentHandler := handlers.NewCommentHandler(serviceContainer.CommentService)
+	log.Println("Comment handlers initialized")
 
 	// 创建路由
 	mux := http.NewServeMux()
@@ -140,6 +149,20 @@ func main() {
 	mux.HandleFunc("GET /api/v1/tags/{slug}", tagHandler.Get)
 	mux.HandleFunc("POST /api/v1/tags", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(tagHandler.Create)).ServeHTTP)
 	mux.HandleFunc("DELETE /api/v1/tags/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(tagHandler.Delete)).ServeHTTP)
+
+	// 评论 API（公开）
+	mux.HandleFunc("GET /api/v1/comments/post/{postId}", commentHandler.GetByPost)
+
+	// 评论 API（需认证）
+	mux.HandleFunc("POST /api/v1/comments", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Create)).ServeHTTP)
+	mux.HandleFunc("PUT /api/v1/comments/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Update)).ServeHTTP)
+	mux.HandleFunc("DELETE /api/v1/comments/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Delete)).ServeHTTP)
+	mux.HandleFunc("POST /api/v1/comments/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Like)).ServeHTTP)
+	mux.HandleFunc("DELETE /api/v1/comments/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Unlike)).ServeHTTP)
+
+	// 评论审核 API（需认证，需管理员权限）
+	mux.HandleFunc("PUT /api/v1/comments/{id}/approve", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Approve)).ServeHTTP)
+	mux.HandleFunc("PUT /api/v1/comments/{id}/reject", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Reject)).ServeHTTP)
 
 	// 健康检查端点
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

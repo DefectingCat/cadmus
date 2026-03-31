@@ -8,6 +8,7 @@ package services
 
 import (
 	"rua.plus/cadmus/internal/auth"
+	"rua.plus/cadmus/internal/core/comment"
 	"rua.plus/cadmus/internal/core/post"
 	"rua.plus/cadmus/internal/core/user"
 )
@@ -20,6 +21,7 @@ type Container struct {
 	CategoryService CategoryService
 	TagService      TagService
 	SeriesService   SeriesService
+	CommentService  CommentService
 	jwtService      *auth.JWTService
 }
 
@@ -88,4 +90,37 @@ func NewContainerWithPosts(
 // JWTService 获取 JWT 服务（供 Handler 直接使用）
 func (c *Container) JWTService() *auth.JWTService {
 	return c.jwtService
+}
+
+// NewContainerWithComments 创建带评论服务的完整容器
+func NewContainerWithComments(
+	userRepo user.UserRepository,
+	roleRepo user.RoleRepository,
+	jwtService *auth.JWTService,
+	blacklist TokenBlacklist,
+	postRepo post.PostRepository,
+	categoryRepo post.CategoryRepository,
+	tagRepo post.TagRepository,
+	seriesRepo post.SeriesRepository,
+	commentRepo comment.CommentRepository,
+	commentLikeRepo comment.CommentLikeRepository,
+) *Container {
+	userService := NewUserService(userRepo, roleRepo)
+	authService := NewAuthServiceWithBlacklist(userRepo, jwtService, blacklist)
+	postService := NewPostService(postRepo, categoryRepo, tagRepo, seriesRepo)
+	categoryService := NewCategoryService(categoryRepo)
+	tagService := NewTagService(tagRepo)
+	seriesService := NewSeriesService(seriesRepo)
+	commentService := NewCommentService(commentRepo, commentLikeRepo)
+
+	return &Container{
+		UserService:     userService,
+		AuthService:     authService,
+		PostService:     postService,
+		CategoryService: categoryService,
+		TagService:      tagService,
+		SeriesService:   seriesService,
+		CommentService:  commentService,
+		jwtService:      jwtService,
+	}
 }
