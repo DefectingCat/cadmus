@@ -13,12 +13,30 @@ import (
 
 // CommentHandler 评论 API 处理器
 type CommentHandler struct {
-	commentService services.CommentService
+	commentService     services.CommentService
+	notificationService services.NotificationService
+	postService        services.PostService
+	userService        services.UserService
 }
 
 // NewCommentHandler 创建评论处理器
 func NewCommentHandler(commentService services.CommentService) *CommentHandler {
 	return &CommentHandler{commentService: commentService}
+}
+
+// NewCommentHandlerWithNotifications 创建带通知功能的评论处理器
+func NewCommentHandlerWithNotifications(
+	commentService services.CommentService,
+	notificationService services.NotificationService,
+	postService services.PostService,
+	userService services.UserService,
+) *CommentHandler {
+	return &CommentHandler{
+		commentService:     commentService,
+		notificationService: notificationService,
+		postService:        postService,
+		userService:        userService,
+	}
 }
 
 // CreateCommentRequest 创建评论请求
@@ -146,6 +164,9 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		WriteAPIError(w, "INTERNAL_ERROR", "创建评论失败: "+err.Error(), nil, http.StatusInternalServerError)
 		return
 	}
+
+	// 发送通知（异步，不影响响应）
+	h.sendCommentNotification(ctx, c, req.PostID, req.ParentID, userID)
 
 	WriteJSON(w, toCommentResponse(c), http.StatusCreated)
 }
@@ -407,4 +428,53 @@ func toCommentNodeCommentResponse(c *comment.Comment) CommentResponse {
 		CreatedAt: c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt: c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
+}
+
+// sendCommentNotification 发送评论通知（异步）
+func (h *CommentHandler) sendCommentNotification(ctx context.Context, c *comment.Comment, postID uuid.UUID, parentID *uuid.UUID, commentUserID uuid.UUID) {
+	// 如果没有通知服务，跳过
+	if h.notificationService == nil {
+		return
+	}
+
+	// 在后台异步发送通知
+	go func() {
+		bgCtx := context.Background()
+
+		// 获取文章信息
+		post, err := h.postService.GetByID(bgCtx, postID)
+		if err != nil {
+			return
+		}
+
+		// 获取评论者信息
+		commentAuthor, err := h.userService.GetByID(bgCtx, commentUserID)
+		if err != nil {
+			return
+		}
+
+		if parentID != nil {
+			// 回复评论：通知被回复用户
+			parentComment, err := h.commentService.GetCommentByID(bgCtx, *parentID)
+			if err != nil {
+				return
+			}
+
+			// 获取被回复用户信息
+			parentAuthor, err := h.userService.GetByID(bgCtx, parentComment.UserID)
+			if err != nil {
+				return
+			}
+
+			h.notificationService.SendReplyNotification(bgCtx, c, parentComment, post, commentAuthor, parentAuthor)
+		} else {
+			// 顶层评论：通知文章作者
+			postAuthor, err := h.userService.GetByID(bgCtx, post.AuthorID)
+			if err != nil {
+				return
+			}
+
+			h.notificationService.SendCommentNotification(bgCtx, c, post, postAuthor, commentAuthor)
+		}
+	}()
 }

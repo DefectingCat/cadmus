@@ -13,6 +13,7 @@ import (
 	"rua.plus/cadmus/internal/api/handlers"
 	"rua.plus/cadmus/internal/auth"
 	"rua.plus/cadmus/internal/cache"
+	"rua.plus/cadmus/internal/core/rss"
 	"rua.plus/cadmus/internal/database"
 	"rua.plus/cadmus/internal/services"
 	_ "rua.plus/cadmus/plugins/mermaid-block" // 启用 Mermaid 图表块插件（blank import 触发 init）
@@ -83,6 +84,9 @@ func main() {
 
 	// 媒体相关 repositories
 	mediaRepo := database.NewMediaRepository(pool)
+
+	// 搜索相关 repositories
+	searchRepo := database.NewSearchRepository(pool)
 	log.Println("Repositories initialized")
 
 	// 初始化 JWT 服务
@@ -108,7 +112,7 @@ func main() {
 		userRepo, roleRepo, jwtService, tokenBlacklist,
 		postRepo, categoryRepo, tagRepo, seriesRepo,
 		commentRepo, commentLikeRepo,
-		mediaRepo, uploadDir, baseURL, postLikeRepo,
+		mediaRepo, uploadDir, baseURL, postLikeRepo, searchRepo,
 	)
 	log.Println("Service container initialized")
 
@@ -135,6 +139,17 @@ func main() {
 	mediaHandler := handlers.NewMediaHandler(serviceContainer.MediaService)
 	log.Println("Media handlers initialized")
 
+	// 初始化 RSS 处理器
+	rssConfig := rss.DefaultFeedConfig()
+	rssConfig.BaseURL = baseURL + "/posts"
+	rssConfig.Link = baseURL
+	rssHandler := handlers.NewRSSHandler(serviceContainer.RSSService, rssConfig)
+	log.Println("RSS handlers initialized")
+
+	// 初始化搜索处理器
+	searchHandler := handlers.NewSearchHandler(serviceContainer.SearchService)
+	log.Println("Search handlers initialized")
+
 	// 创建路由
 	mux := http.NewServeMux()
 
@@ -149,9 +164,12 @@ func main() {
 	// 文章 API（公开）
 	mux.HandleFunc("GET /api/v1/posts", postHandler.List)
 	mux.HandleFunc("GET /api/v1/posts/{slug}", postHandler.Get)
-	mux.HandleFunc("GET /api/v1/search", postHandler.Search)
 	mux.HandleFunc("GET /api/v1/posts/{id}/versions", postHandler.Versions)
 	mux.HandleFunc("GET /api/v1/users/{id}/posts", postHandler.GetUserPosts)
+
+	// 搜索 API（公开）
+	mux.HandleFunc("GET /api/v1/search", searchHandler.Search)
+	mux.HandleFunc("GET /api/v1/search/suggestions", searchHandler.Suggestions)
 
 	// 文章 API（需认证）
 	mux.HandleFunc("POST /api/v1/posts", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Create)).ServeHTTP)
@@ -194,6 +212,9 @@ func main() {
 	mux.HandleFunc("DELETE /api/v1/media/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Delete)).ServeHTTP)
 	mux.HandleFunc("GET /api/v1/media", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.List)).ServeHTTP)
 	mux.HandleFunc("GET /api/v1/media/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Get)).ServeHTTP)
+
+	// RSS 订阅 API（公开）
+	mux.HandleFunc("GET /api/v1/rss", rssHandler.Feed)
 
 	// 健康检查端点
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

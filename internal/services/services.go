@@ -10,21 +10,26 @@ import (
 	"rua.plus/cadmus/internal/auth"
 	"rua.plus/cadmus/internal/core/comment"
 	"rua.plus/cadmus/internal/core/media"
+	"rua.plus/cadmus/internal/core/notify"
 	"rua.plus/cadmus/internal/core/post"
+	"rua.plus/cadmus/internal/core/search"
 	"rua.plus/cadmus/internal/core/user"
 )
 
 // Container 服务容器，聚合所有业务服务
 type Container struct {
-	UserService     UserService
-	AuthService     AuthService
-	PostService     PostService
-	CategoryService CategoryService
-	TagService      TagService
-	SeriesService   SeriesService
-	CommentService  CommentService
-	MediaService    MediaService
-	jwtService      *auth.JWTService
+	UserService        UserService
+	AuthService        AuthService
+	PostService        PostService
+	CategoryService    CategoryService
+	TagService         TagService
+	SeriesService      SeriesService
+	CommentService     CommentService
+	MediaService       MediaService
+	NotificationService NotificationService
+	RSSService         RSSService
+	SearchService      SearchService
+	jwtService         *auth.JWTService
 }
 
 // NewContainer 创建服务容器
@@ -143,6 +148,7 @@ func NewContainerWithMedia(
 	uploadDir string,
 	baseURL string,
 	postLikeRepo post.PostLikeRepository,
+	searchRepo search.SearchRepository,
 ) *Container {
 	userService := NewUserService(userRepo, roleRepo)
 	authService := NewAuthServiceWithBlacklist(userRepo, jwtService, blacklist)
@@ -152,6 +158,8 @@ func NewContainerWithMedia(
 	seriesService := NewSeriesService(seriesRepo)
 	commentService := NewCommentService(commentRepo, commentLikeRepo)
 	mediaService := NewMediaService(mediaRepo, uploadDir, baseURL)
+	rssService := NewRSSService(postRepo, categoryRepo)
+	searchService := NewSearchService(searchRepo)
 
 	return &Container{
 		UserService:     userService,
@@ -162,6 +170,58 @@ func NewContainerWithMedia(
 		SeriesService:   seriesService,
 		CommentService:  commentService,
 		MediaService:    mediaService,
+		RSSService:      rssService,
+		SearchService:   searchService,
 		jwtService:      jwtService,
+	}
+}
+
+// NotificationChannel 通知渠道别名，用于简化容器创建
+type NotificationChannel = notify.NotificationChannel
+
+// NewContainerWithNotifications 创建带通知服务的完整容器
+func NewContainerWithNotifications(
+	userRepo user.UserRepository,
+	roleRepo user.RoleRepository,
+	jwtService *auth.JWTService,
+	blacklist TokenBlacklist,
+	postRepo post.PostRepository,
+	categoryRepo post.CategoryRepository,
+	tagRepo post.TagRepository,
+	seriesRepo post.SeriesRepository,
+	commentRepo comment.CommentRepository,
+	commentLikeRepo comment.CommentLikeRepository,
+	mediaRepo media.MediaRepository,
+	uploadDir string,
+	baseURL string,
+	postLikeRepo post.PostLikeRepository,
+	searchRepo search.SearchRepository,
+	notificationChannel NotificationChannel,
+) *Container {
+	userService := NewUserService(userRepo, roleRepo)
+	authService := NewAuthServiceWithBlacklist(userRepo, jwtService, blacklist)
+	postService := NewPostServiceWithLikes(postRepo, categoryRepo, tagRepo, seriesRepo, postLikeRepo)
+	categoryService := NewCategoryService(categoryRepo)
+	tagService := NewTagService(tagRepo)
+	seriesService := NewSeriesService(seriesRepo)
+	commentService := NewCommentService(commentRepo, commentLikeRepo)
+	mediaService := NewMediaService(mediaRepo, uploadDir, baseURL)
+	rssService := NewRSSService(postRepo, categoryRepo)
+	searchService := NewSearchService(searchRepo)
+	notificationService := NewNotificationService(notificationChannel)
+
+	return &Container{
+		UserService:        userService,
+		AuthService:        authService,
+		PostService:        postService,
+		CategoryService:    categoryService,
+		TagService:         tagService,
+		SeriesService:      seriesService,
+		CommentService:     commentService,
+		MediaService:       mediaService,
+		NotificationService: notificationService,
+		RSSService:         rssService,
+		SearchService:      searchService,
+		jwtService:         jwtService,
 	}
 }
