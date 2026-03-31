@@ -183,12 +183,6 @@ func ExtractToken(r *http.Request) string {
 		return authHeader
 	}
 
-	// 从 query 参数提取
-	token := r.URL.Query().Get("token")
-	if token != "" {
-		return token
-	}
-
 	// 从 cookie 提取
 	cookie, err := r.Cookie("auth_token")
 	if err == nil && cookie.Value != "" {

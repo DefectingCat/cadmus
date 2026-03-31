@@ -21,6 +21,9 @@ func DefaultJWTConfig() (JWTConfig, error) {
 	if secret == "" {
 		return JWTConfig{}, errors.New("JWT_SECRET environment variable is required")
 	}
+	if len(secret) < 32 {
+		return JWTConfig{}, errors.New("JWT_SECRET must be at least 32 characters for security")
+	}
 
 	return JWTConfig{
 		Secret:        secret,

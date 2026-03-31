@@ -377,6 +377,165 @@ func (h *PostHandler) Versions(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, versions, http.StatusOK)
 }
 
+// RollbackRequest 回滚请求
+type RollbackRequest struct {
+	Version int `json:"version"`
+}
+
+// Rollback 回滚到指定版本
+// POST /api/v1/posts/{id}/rollback
+func (h *PostHandler) Rollback(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := r.PathValue("id")
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		WriteAPIError(w, "BAD_REQUEST", "无效的文章ID", nil, http.StatusBadRequest)
+		return
+	}
+
+	var req RollbackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteAPIError(w, "BAD_REQUEST", "请求格式错误", nil, http.StatusBadRequest)
+		return
+	}
+
+	if req.Version < 1 {
+		WriteAPIError(w, "BAD_REQUEST", "版本号必须大于0", nil, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.postService.Rollback(ctx, id, req.Version); err != nil {
+		if err.Error() == "版本不存在" {
+			WriteAPIError(w, "NOT_FOUND", "版本不存在", nil, http.StatusNotFound)
+			return
+		}
+		WriteAPIError(w, "INTERNAL_ERROR", "回滚失败: "+err.Error(), nil, http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, map[string]string{"message": "文章已回滚到版本 " + strconv.Itoa(req.Version)}, http.StatusOK)
+}
+
+// GetUserPosts 获取用户的文章列表
+// GET /api/v1/users/{id}/posts
+func (h *PostHandler) GetUserPosts(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// 解析用户 ID
+	idStr := r.PathValue("id")
+	authorID, err := uuid.Parse(idStr)
+	if err != nil {
+		WriteAPIError(w, "BAD_REQUEST", "无效的用户ID", nil, http.StatusBadRequest)
+		return
+	}
+
+	// 解析分页参数
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	// 解析状态筛选参数
+	status := post.PostStatus(r.URL.Query().Get("status"))
+	if status != "" && !status.IsValid() {
+		WriteAPIError(w, "BAD_REQUEST", "无效的文章状态", nil, http.StatusBadRequest)
+		return
+	}
+
+	posts, total, err := h.postService.GetByAuthor(ctx, authorID, status, page, limit)
+	if err != nil {
+		WriteAPIError(w, "INTERNAL_ERROR", "获取用户文章列表失败", nil, http.StatusInternalServerError)
+		return
+	}
+
+	responses := make([]PostResponse, 0, len(posts))
+	for _, p := range posts {
+		responses = append(responses, toPostResponse(p))
+	}
+
+	WriteJSON(w, PostListResponse{
+		Posts:    responses,
+		Total:    total,
+		Page:     page,
+		PageSize: limit,
+	}, http.StatusOK)
+}
+
+// Like 点赞文章
+// POST /api/v1/posts/{id}/like
+func (h *PostHandler) Like(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := r.PathValue("id")
+
+	postID, err := uuid.Parse(idStr)
+	if err != nil {
+		WriteAPIError(w, "BAD_REQUEST", "无效的文章ID", nil, http.StatusBadRequest)
+		return
+	}
+
+	// 获取当前用户 ID
+	userID, err := GetUserID(ctx)
+	if err != nil {
+		WriteAPIError(w, "UNAUTHORIZED", "未登录", nil, http.StatusUnauthorized)
+		return
+	}
+
+	if err := h.postService.LikePost(ctx, postID, userID); err != nil {
+		if err.Error() == "已点赞过该文章" {
+			WriteAPIError(w, "ALREADY_LIKED", "已点赞过该文章", nil, http.StatusBadRequest)
+			return
+		}
+		if err.Error() == "文章不存在" {
+			WriteAPIError(w, "NOT_FOUND", "文章不存在", nil, http.StatusNotFound)
+			return
+		}
+		WriteAPIError(w, "INTERNAL_ERROR", "点赞失败", nil, http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, map[string]string{"message": "点赞成功"}, http.StatusOK)
+}
+
+// Unlike 取消点赞
+// DELETE /api/v1/posts/{id}/like
+func (h *PostHandler) Unlike(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := r.PathValue("id")
+
+	postID, err := uuid.Parse(idStr)
+	if err != nil {
+		WriteAPIError(w, "BAD_REQUEST", "无效的文章ID", nil, http.StatusBadRequest)
+		return
+	}
+
+	// 获取当前用户 ID
+	userID, err := GetUserID(ctx)
+	if err != nil {
+		WriteAPIError(w, "UNAUTHORIZED", "未登录", nil, http.StatusUnauthorized)
+		return
+	}
+
+	if err := h.postService.UnlikePost(ctx, postID, userID); err != nil {
+		if err.Error() == "未点赞过该文章" {
+			WriteAPIError(w, "NOT_LIKED", "未点赞过该文章", nil, http.StatusBadRequest)
+			return
+		}
+		if err.Error() == "文章不存在" {
+			WriteAPIError(w, "NOT_FOUND", "文章不存在", nil, http.StatusNotFound)
+			return
+		}
+		WriteAPIError(w, "INTERNAL_ERROR", "取消点赞失败", nil, http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, map[string]string{"message": "取消点赞成功"}, http.StatusOK)
+}
+
 func toPostResponse(p *post.Post) PostResponse {
 	var categoryID *uuid.UUID
 	if p.CategoryID != uuid.Nil {
