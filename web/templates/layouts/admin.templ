@@ -1,105 +1,133 @@
 package layouts
 
-// AdminLayout 后台管理布局模板
-templ AdminLayout(title string) {
+// AdminLayout 后台管理布局模板 - Modern Elegant Design
+templ AdminLayout(title string, currentPage string) {
 	<!DOCTYPE html>
 	<html lang="zh-CN">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>{ title } - Cadmus Admin</title>
-			<link rel="stylesheet" href="/static/dist/styles.css"/>
+			<title>{ title } - Cadmus</title>
+			<link rel="stylesheet" href="/static/dist/admin.css"/>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<script>
+				// 主题初始化 - 在页面渲染前执行
+				(function() {
+					const theme = localStorage.getItem('theme') ||
+						(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+					document.documentElement.setAttribute('data-theme', theme);
+				})();
+			</script>
 		</head>
-		<body class="min-h-screen bg-gray-100">
-			<!-- 侧边栏 -->
-			@AdminSidebar()
+		<body>
+			<div class="admin-layout">
+				<!-- 侧边栏 -->
+				@AdminSidebar(currentPage)
 
-			<!-- 主内容区域 -->
-			<div class="ml-64 min-h-screen">
-				<!-- 顶部导航栏 -->
-				@AdminHeader(title)
+				<!-- 主内容区域 -->
+				<main class="admin-main">
+					<!-- 顶部导航栏 -->
+					@AdminHeader(title)
 
-				<!-- 页面内容 -->
-				<main class="py-6">
-					{ children... }
+					<!-- 页面内容 -->
+					<div class="admin-content animate-fade-in">
+						{ children... }
+					</div>
 				</main>
 			</div>
 
-			<script src="/static/dist/main.js"></script>
+			<script src="/static/dist/admin/main.js"></script>
 		</body>
 	</html>
 }
 
 // AdminSidebar 后台侧边栏
-templ AdminSidebar() {
-	<aside class="fixed left-0 top-0 h-full w-64 bg-gray-900 text-white">
+templ AdminSidebar(currentPage string) {
+	<aside class="admin-sidebar">
 		<!-- Logo -->
-		<div class="p-4 border-b border-gray-800">
-			<a href="/admin" class="text-xl font-bold">Cadmus Admin</a>
+		<div class="sidebar-header">
+			<a href="/admin" class="sidebar-logo">
+				<div class="sidebar-logo-icon">C</div>
+				<span class="sidebar-logo-text">Cadmus</span>
+			</a>
 		</div>
 
 		<!-- 导航菜单 -->
-		<nav class="p-4">
-			<ul class="space-y-2">
-				<li>
-					<a href="/admin" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-						</svg>
-						仪表盘
-					</a>
-				</li>
-				<li>
-					<a href="/admin/posts" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 transition-colors">
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-						</svg>
-						文章管理
-					</a>
-				</li>
-				<li>
-					<a href="/admin/media" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-						</svg>
-						媒体管理
-					</a>
-				</li>
-				<li>
-					<a href="/admin/comments" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-						</svg>
-						评论审核
-					</a>
-				</li>
-				<li>
-					<a href="/admin/users" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-						</svg>
-						用户管理
-					</a>
-				</li>
-				<li>
-					<a href="/admin/settings" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-						</svg>
-						系统设置
-					</a>
-				</li>
-			</ul>
+		<nav class="sidebar-nav">
+			<div class="nav-section">
+				<div class="nav-section-title">内容管理</div>
+				<a href="/admin" class={ "nav-item", templ.KV("active", currentPage == "dashboard") }>
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+					</svg>
+					<span>仪表盘</span>
+				</a>
+				<a href="/admin/posts" class={ "nav-item", templ.KV("active", currentPage == "posts") }>
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+					</svg>
+					<span>文章管理</span>
+				</a>
+				<a href="/admin/media" class={ "nav-item", templ.KV("active", currentPage == "media") }>
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+					</svg>
+					<span>媒体库</span>
+				</a>
+				<a href="/admin/comments" class={ "nav-item", templ.KV("active", currentPage == "comments") }>
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+					</svg>
+					<span>评论审核</span>
+					<span class="nav-badge">5</span>
+				</a>
+			</div>
+
+			<div class="nav-section">
+				<div class="nav-section-title">系统管理</div>
+				<a href="/admin/users" class={ "nav-item", templ.KV("active", currentPage == "users") }>
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+					</svg>
+					<span>用户管理</span>
+				</a>
+				<a href="/admin/categories" class={ "nav-item", templ.KV("active", currentPage == "categories") }>
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+					</svg>
+					<span>分类管理</span>
+				</a>
+				<a href="/admin/plugins" class={ "nav-item", templ.KV("active", currentPage == "plugins") }>
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+					</svg>
+					<span>插件管理</span>
+				</a>
+				<a href="/admin/themes" class={ "nav-item", templ.KV("active", currentPage == "themes") }>
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
+					</svg>
+					<span>主题管理</span>
+				</a>
+				<a href="/admin/settings" class={ "nav-item", templ.KV("active", currentPage == "settings") }>
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+					</svg>
+					<span>系统设置</span>
+				</a>
+			</div>
 		</nav>
 
 		<!-- 底部用户信息 -->
-		<div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800">
-			<div class="flex items-center gap-2">
-				<div class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
-					<span class="text-sm">A</span>
+		<div class="sidebar-footer">
+			<div class="user-card">
+				<div class="user-avatar">A</div>
+				<div class="user-info">
+					<div class="user-name">管理员</div>
+					<div class="user-role">Administrator</div>
 				</div>
-				<span class="text-sm">管理员</span>
 			</div>
 		</div>
 	</aside>
@@ -107,24 +135,34 @@ templ AdminSidebar() {
 
 // AdminHeader 后台顶部导航栏
 templ AdminHeader(title string) {
-	<header class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-		<div class="flex justify-between items-center">
-			<h1 class="text-xl font-semibold text-gray-900">{ title }</h1>
-			<div class="flex items-center gap-4">
-				<!-- 访问前台 -->
-				<a href="/" target="_blank" class="text-gray-600 hover:text-gray-900">
-					访问前台
-				</a>
-				<!-- 用户菜单 -->
-				<div class="relative">
-					<button id="user-menu-btn" class="flex items-center gap-2 text-gray-600 hover:text-gray-900">
-						<div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-							<span class="text-sm">A</span>
-						</div>
-						<span>管理员</span>
-					</button>
-				</div>
-			</div>
+	<header class="admin-topbar">
+		<div class="topbar-left">
+			<h1 class="page-title">{ title }</h1>
+		</div>
+		<div class="topbar-right">
+			<!-- 主题切换按钮 -->
+			<button class="theme-toggle" id="theme-toggle" title="切换主题">
+				<svg class="icon-moon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+				</svg>
+				<svg class="icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+				</svg>
+			</button>
+
+			<a href="/" target="_blank" class="topbar-action">
+				<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+				</svg>
+				<span>访问前台</span>
+			</a>
+
+			<a href="/admin/posts/new" class="topbar-action primary">
+				<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"></path>
+				</svg>
+				<span>新建文章</span>
+			</a>
 		</div>
 	</header>
 }
