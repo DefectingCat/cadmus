@@ -9,6 +9,7 @@ package services
 import (
 	"rua.plus/cadmus/internal/auth"
 	"rua.plus/cadmus/internal/core/comment"
+	"rua.plus/cadmus/internal/core/media"
 	"rua.plus/cadmus/internal/core/post"
 	"rua.plus/cadmus/internal/core/user"
 )
@@ -22,6 +23,7 @@ type Container struct {
 	TagService      TagService
 	SeriesService   SeriesService
 	CommentService  CommentService
+	MediaService    MediaService
 	jwtService      *auth.JWTService
 }
 
@@ -121,6 +123,45 @@ func NewContainerWithComments(
 		TagService:      tagService,
 		SeriesService:   seriesService,
 		CommentService:  commentService,
+		jwtService:      jwtService,
+	}
+}
+
+// NewContainerWithMedia 创建带媒体服务的完整容器
+func NewContainerWithMedia(
+	userRepo user.UserRepository,
+	roleRepo user.RoleRepository,
+	jwtService *auth.JWTService,
+	blacklist TokenBlacklist,
+	postRepo post.PostRepository,
+	categoryRepo post.CategoryRepository,
+	tagRepo post.TagRepository,
+	seriesRepo post.SeriesRepository,
+	commentRepo comment.CommentRepository,
+	commentLikeRepo comment.CommentLikeRepository,
+	mediaRepo media.MediaRepository,
+	uploadDir string,
+	baseURL string,
+	postLikeRepo post.PostLikeRepository,
+) *Container {
+	userService := NewUserService(userRepo, roleRepo)
+	authService := NewAuthServiceWithBlacklist(userRepo, jwtService, blacklist)
+	postService := NewPostServiceWithLikes(postRepo, categoryRepo, tagRepo, seriesRepo, postLikeRepo)
+	categoryService := NewCategoryService(categoryRepo)
+	tagService := NewTagService(tagRepo)
+	seriesService := NewSeriesService(seriesRepo)
+	commentService := NewCommentService(commentRepo, commentLikeRepo)
+	mediaService := NewMediaService(mediaRepo, uploadDir, baseURL)
+
+	return &Container{
+		UserService:     userService,
+		AuthService:     authService,
+		PostService:     postService,
+		CategoryService: categoryService,
+		TagService:      tagService,
+		SeriesService:   seriesService,
+		CommentService:  commentService,
+		MediaService:    mediaService,
 		jwtService:      jwtService,
 	}
 }

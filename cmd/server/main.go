@@ -15,7 +15,11 @@ import (
 	"rua.plus/cadmus/internal/cache"
 	"rua.plus/cadmus/internal/database"
 	"rua.plus/cadmus/internal/services"
+	_ "rua.plus/cadmus/plugins/mermaid-block" // 启用 Mermaid 图表块插件（blank import 触发 init）
 	"rua.plus/cadmus/web/templates/pages"
+
+	// 启用默认主题（blank import 触发 init()）
+	_ "rua.plus/cadmus/themes/default"
 )
 
 func main() {
@@ -55,14 +59,14 @@ func main() {
 	defer redisClient.Close()
 	log.Println("Redis connection pool initialized")
 
-	// 初始化缓存服务（保留用于后续任务）
-	_ = cache.NewService(redisClient)
+	// 初始化缓存服务
+	cacheService := cache.NewService(redisClient)
 	log.Println("Cache service initialized")
 
 	// 初始化 repositories
 	userRepo := database.NewUserRepository(pool)
 	roleRepo := database.NewRoleRepository(pool)
-	_ = database.NewPermissionRepository(pool) // 保留用于后续权限检查
+	permRepo := database.NewPermissionRepository(pool)
 
 	// 文章相关 repositories
 	postRepo := database.NewPostRepository(pool)
@@ -73,6 +77,12 @@ func main() {
 	// 评论相关 repositories
 	commentRepo := database.NewCommentRepository(pool)
 	commentLikeRepo := database.NewCommentLikeRepository(pool)
+
+	// 文章点赞 repository
+	postLikeRepo := database.NewPostLikeRepository(pool)
+
+	// 媒体相关 repositories
+	mediaRepo := database.NewMediaRepository(pool)
 	log.Println("Repositories initialized")
 
 	// 初始化 JWT 服务
@@ -87,11 +97,18 @@ func main() {
 	tokenBlacklist := auth.NewRedisTokenBlacklist(redisClient)
 	log.Println("Token blacklist initialized")
 
-	// 初始化 Service 容器（带评论服务）
-	serviceContainer := services.NewContainerWithComments(
+	// 初始化权限缓存
+	permCache := auth.NewPermissionCache(cacheService, permRepo, redisClient.Client())
+	log.Println("Permission cache initialized")
+
+	// 初始化 Service 容器（带媒体服务）
+	uploadDir := getEnvOrDefault("UPLOAD_DIR", "./uploads")
+	baseURL := getEnvOrDefault("BASE_URL", "http://localhost:"+port)
+	serviceContainer := services.NewContainerWithMedia(
 		userRepo, roleRepo, jwtService, tokenBlacklist,
 		postRepo, categoryRepo, tagRepo, seriesRepo,
 		commentRepo, commentLikeRepo,
+		mediaRepo, uploadDir, baseURL, postLikeRepo,
 	)
 	log.Println("Service container initialized")
 
@@ -114,6 +131,10 @@ func main() {
 	commentHandler := handlers.NewCommentHandler(serviceContainer.CommentService)
 	log.Println("Comment handlers initialized")
 
+	// 初始化媒体处理器
+	mediaHandler := handlers.NewMediaHandler(serviceContainer.MediaService)
+	log.Println("Media handlers initialized")
+
 	// 创建路由
 	mux := http.NewServeMux()
 
@@ -130,12 +151,16 @@ func main() {
 	mux.HandleFunc("GET /api/v1/posts/{slug}", postHandler.Get)
 	mux.HandleFunc("GET /api/v1/search", postHandler.Search)
 	mux.HandleFunc("GET /api/v1/posts/{id}/versions", postHandler.Versions)
+	mux.HandleFunc("GET /api/v1/users/{id}/posts", postHandler.GetUserPosts)
 
 	// 文章 API（需认证）
 	mux.HandleFunc("POST /api/v1/posts", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Create)).ServeHTTP)
 	mux.HandleFunc("PUT /api/v1/posts/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Update)).ServeHTTP)
 	mux.HandleFunc("DELETE /api/v1/posts/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Delete)).ServeHTTP)
 	mux.HandleFunc("POST /api/v1/posts/{id}/publish", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Publish)).ServeHTTP)
+	mux.HandleFunc("POST /api/v1/posts/{id}/rollback", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Rollback)).ServeHTTP)
+	mux.HandleFunc("POST /api/v1/posts/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Like)).ServeHTTP)
+	mux.HandleFunc("DELETE /api/v1/posts/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Unlike)).ServeHTTP)
 
 	// 分类 API
 	mux.HandleFunc("GET /api/v1/categories", categoryHandler.List)
@@ -160,9 +185,15 @@ func main() {
 	mux.HandleFunc("POST /api/v1/comments/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Like)).ServeHTTP)
 	mux.HandleFunc("DELETE /api/v1/comments/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Unlike)).ServeHTTP)
 
-	// 评论审核 API（需认证，需管理员权限）
-	mux.HandleFunc("PUT /api/v1/comments/{id}/approve", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Approve)).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/comments/{id}/reject", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Reject)).ServeHTTP)
+	// 评论审核 API（需认证，需 comment:moderate 权限）
+	mux.HandleFunc("PUT /api/v1/comments/{id}/approve", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.Approve)).ServeHTTP)
+	mux.HandleFunc("PUT /api/v1/comments/{id}/reject", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.Reject)).ServeHTTP)
+
+	// 媒体 API（需认证）
+	mux.HandleFunc("POST /api/v1/media/upload", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Upload)).ServeHTTP)
+	mux.HandleFunc("DELETE /api/v1/media/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Delete)).ServeHTTP)
+	mux.HandleFunc("GET /api/v1/media", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.List)).ServeHTTP)
+	mux.HandleFunc("GET /api/v1/media/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Get)).ServeHTTP)
 
 	// 健康检查端点
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +206,9 @@ func main() {
 
 	// 静态文件服务
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+
+	// 上传文件静态服务
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadDir))))
 
 	// 创建 HTTP server
 	server := &http.Server{
