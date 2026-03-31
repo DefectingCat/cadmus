@@ -373,16 +373,43 @@ func (r *CommentLikeRepository) Create(ctx context.Context, commentID, userID uu
 		return nil, fmt.Errorf("failed to create comment like: %w", err)
 	}
 
-	// 更新评论的点赞计数
-	updateQuery := `UPDATE comments SET like_count = like_count + 1 WHERE id = $1`
-	_, _ = r.pool.Exec(ctx, updateQuery, commentID)
-
 	return &comment.CommentLike{
 		ID:        id,
 		CommentID: commentID,
 		UserID:    userID,
 		CreatedAt: now,
 	}, nil
+}
+
+// CreateIfNotExists 创建点赞记录（使用 ON CONFLICT DO NOTHING），返回是否实际创建
+// 同时原子更新评论的点赞计数
+func (r *CommentLikeRepository) CreateIfNotExists(ctx context.Context, commentID, userID uuid.UUID) (created bool, err error) {
+	query := `
+		INSERT INTO comment_likes (id, comment_id, user_id, created_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (comment_id, user_id) DO NOTHING
+	`
+
+	id := uuid.New()
+	now := time.Now()
+
+	result, err := r.pool.Exec(ctx, query, id, commentID, userID, now)
+	if err != nil {
+		return false, fmt.Errorf("failed to create comment like: %w", err)
+	}
+
+	created = result.RowsAffected() > 0
+
+	// 只有实际创建点赞记录时才更新计数
+	if created {
+		updateQuery := `UPDATE comments SET like_count = like_count + 1 WHERE id = $1`
+		_, err = r.pool.Exec(ctx, updateQuery, commentID)
+		if err != nil {
+			return false, fmt.Errorf("failed to update like count: %w", err)
+		}
+	}
+
+	return created, nil
 }
 
 // GetByCommentAndUser 获取用户对评论的点赞记录
@@ -421,11 +448,31 @@ func (r *CommentLikeRepository) Delete(ctx context.Context, commentID, userID uu
 		return comment.ErrNotLiked
 	}
 
-	// 更新评论的点赞计数
-	updateQuery := `UPDATE comments SET like_count = like_count - 1 WHERE id = $1 AND like_count > 0`
-	_, _ = r.pool.Exec(ctx, updateQuery, commentID)
-
 	return nil
+}
+
+// DeleteIfExists 删除点赞记录（返回是否实际删除）
+// 同时原子更新评论的点赞计数
+func (r *CommentLikeRepository) DeleteIfExists(ctx context.Context, commentID, userID uuid.UUID) (deleted bool, err error) {
+	query := `DELETE FROM comment_likes WHERE comment_id = $1 AND user_id = $2`
+
+	result, err := r.pool.Exec(ctx, query, commentID, userID)
+	if err != nil {
+		return false, fmt.Errorf("failed to delete comment like: %w", err)
+	}
+
+	deleted = result.RowsAffected() > 0
+
+	// 只有实际删除点赞记录时才更新计数
+	if deleted {
+		updateQuery := `UPDATE comments SET like_count = like_count - 1 WHERE id = $1 AND like_count > 0`
+		_, err = r.pool.Exec(ctx, updateQuery, commentID)
+		if err != nil {
+			return false, fmt.Errorf("failed to update like count: %w", err)
+		}
+	}
+
+	return deleted, nil
 }
 
 // Exists 检查用户是否已点赞评论

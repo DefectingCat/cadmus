@@ -48,11 +48,17 @@ type CommentLikeRepository interface {
 	// Create 创建点赞记录
 	Create(ctx context.Context, commentID, userID uuid.UUID) (*CommentLike, error)
 
+	// CreateIfNotExists 创建点赞记录（使用 ON CONFLICT DO NOTHING），返回是否实际创建
+	CreateIfNotExists(ctx context.Context, commentID, userID uuid.UUID) (created bool, err error)
+
 	// GetByCommentAndUser 获取用户对评论的点赞记录
 	GetByCommentAndUser(ctx context.Context, commentID, userID uuid.UUID) (*CommentLike, error)
 
 	// Delete 删除点赞记录（取消点赞）
 	Delete(ctx context.Context, commentID, userID uuid.UUID) error
+
+	// DeleteIfExists 删除点赞记录（返回是否实际删除）
+	DeleteIfExists(ctx context.Context, commentID, userID uuid.UUID) (deleted bool, err error)
 
 	// Exists 检查用户是否已点赞评论
 	Exists(ctx context.Context, commentID, userID uuid.UUID) (bool, error)

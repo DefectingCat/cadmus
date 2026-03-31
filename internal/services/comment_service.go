@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"rua.plus/cadmus/internal/core/comment"
@@ -226,57 +225,36 @@ func (s *commentServiceImpl) LikeComment(ctx context.Context, commentID, userID 
 		return errors.New("只能点赞已批准的评论")
 	}
 
-	// 检查是否已点赞
-	exists, err := s.likeRepo.Exists(ctx, commentID, userID)
+	// 使用原子操作创建点赞记录并更新计数
+	created, err := s.likeRepo.CreateIfNotExists(ctx, commentID, userID)
 	if err != nil {
 		return err
 	}
-	if exists {
+	if !created {
 		return comment.ErrAlreadyLiked
 	}
 
-	// 创建点赞记录
-	_, err = s.likeRepo.Create(ctx, commentID, userID)
-	if err != nil {
-		return err
-	}
-
-	// 更新点赞计数
-	c.LikeCount++
-	c.UpdatedAt = time.Now()
-	return s.commentRepo.Update(ctx, c)
+	return nil
 }
 
 // UnlikeComment 取消点赞
 func (s *commentServiceImpl) UnlikeComment(ctx context.Context, commentID, userID uuid.UUID) error {
 	// 检查评论是否存在
-	c, err := s.commentRepo.GetByID(ctx, commentID)
+	_, err := s.commentRepo.GetByID(ctx, commentID)
 	if err != nil {
 		return comment.ErrCommentNotFound
 	}
 
-	// 检查是否已点赞
-	exists, err := s.likeRepo.Exists(ctx, commentID, userID)
+	// 使用原子操作删除点赞记录并更新计数
+	deleted, err := s.likeRepo.DeleteIfExists(ctx, commentID, userID)
 	if err != nil {
 		return err
 	}
-	if !exists {
+	if !deleted {
 		return comment.ErrNotLiked
 	}
 
-	// 删除点赞记录
-	err = s.likeRepo.Delete(ctx, commentID, userID)
-	if err != nil {
-		return err
-	}
-
-	// 更新点赞计数
-	c.LikeCount--
-	if c.LikeCount < 0 {
-		c.LikeCount = 0
-	}
-	c.UpdatedAt = time.Now()
-	return s.commentRepo.Update(ctx, c)
+	return nil
 }
 
 // IsLiked 检查用户是否已点赞
