@@ -8,14 +8,19 @@ package services
 
 import (
 	"rua.plus/cadmus/internal/auth"
+	"rua.plus/cadmus/internal/core/post"
 	"rua.plus/cadmus/internal/core/user"
 )
 
 // Container 服务容器，聚合所有业务服务
 type Container struct {
-	UserService  UserService
-	AuthService  AuthService
-	jwtService   *auth.JWTService
+	UserService     UserService
+	AuthService     AuthService
+	PostService     PostService
+	CategoryService CategoryService
+	TagService      TagService
+	SeriesService   SeriesService
+	jwtService      *auth.JWTService
 }
 
 // NewContainer 创建服务容器
@@ -48,6 +53,35 @@ func NewContainerWithBlacklist(
 		UserService:  userService,
 		AuthService:  authService,
 		jwtService:   jwtService,
+	}
+}
+
+// NewContainerWithPosts 创建带文章服务的完整容器
+func NewContainerWithPosts(
+	userRepo user.UserRepository,
+	roleRepo user.RoleRepository,
+	jwtService *auth.JWTService,
+	blacklist TokenBlacklist,
+	postRepo post.PostRepository,
+	categoryRepo post.CategoryRepository,
+	tagRepo post.TagRepository,
+	seriesRepo post.SeriesRepository,
+) *Container {
+	userService := NewUserService(userRepo, roleRepo)
+	authService := NewAuthServiceWithBlacklist(userRepo, jwtService, blacklist)
+	postService := NewPostService(postRepo, categoryRepo, tagRepo, seriesRepo)
+	categoryService := NewCategoryService(categoryRepo)
+	tagService := NewTagService(tagRepo)
+	seriesService := NewSeriesService(seriesRepo)
+
+	return &Container{
+		UserService:     userService,
+		AuthService:     authService,
+		PostService:     postService,
+		CategoryService: categoryService,
+		TagService:      tagService,
+		SeriesService:   seriesService,
+		jwtService:      jwtService,
 	}
 }
 
