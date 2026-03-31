@@ -17,10 +17,23 @@ build/frontend:
 		--outdir=../static/dist \
 		--minify \
 		--format=esm
-	cd web/frontend && bun @tailwindcss/cli \
+	cd web/frontend && bun esbuild src/admin/main.ts \
+		--bundle \
+		--outdir=../static/dist/admin \
+		--minify \
+		--format=esm
+	cd web/frontend && bunx @tailwindcss/cli \
 		-i src/styles/main.css \
 		-o ../static/dist/styles.css \
 		--minify
+	cd web/frontend && bunx @tailwindcss/cli \
+		-i src/styles/admin.css \
+		-o ../static/dist/admin.css \
+		--minify
+
+# Generate templ files
+build/templ:
+	templ generate
 
 # Editor entry point (separate bundle for editor pages)
 build/editor:

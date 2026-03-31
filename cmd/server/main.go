@@ -14,6 +14,7 @@ import (
 	"rua.plus/cadmus/internal/auth"
 	"rua.plus/cadmus/internal/cache"
 	"rua.plus/cadmus/internal/core/comment"
+	"rua.plus/cadmus/internal/core/post"
 	"rua.plus/cadmus/internal/core/rss"
 	"rua.plus/cadmus/internal/database"
 	"rua.plus/cadmus/internal/services"
@@ -267,6 +268,37 @@ func main() {
 	// 管理后台页面（需要认证和管理员权限）
 	adminPageAuth := handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)
 	adminPagePerm := handlers.AdminMiddleware(permCache)
+
+	// 仪表盘
+	mux.Handle("GET /admin", adminPageAuth(adminPagePerm(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// 获取统计数据
+		filters := post.PostListFilters{}
+		recentPosts, postCount, _ := postRepo.List(ctx, filters, 0, 5)
+
+		commentFilters := &comment.CommentListFilters{}
+		recentComments, _ := commentRepo.List(ctx, commentFilters, 0, 5)
+
+		pendingFilters := &comment.CommentListFilters{Status: comment.StatusPending}
+		pendingComments, _ := commentRepo.List(ctx, pendingFilters, 0, 100)
+		pendingCount := len(pendingComments)
+
+		// 获取用户数
+		_, userCount, _ := serviceContainer.UserService.List(ctx, 0, 1)
+
+		stats := adminpages.DashboardStats{
+			TotalPosts:    postCount,
+			TotalViews:    0, // 暂无总浏览统计
+			TotalComments: 0, // 暂无总评论统计
+			TotalUsers:    userCount,
+			ActiveTheme:   "default",
+		}
+
+		templ.Handler(adminpages.DashboardPage(stats, recentPosts, recentComments, pendingCount)).ServeHTTP(w, r)
+	}))))
+
+	// 评论管理
 	mux.Handle("GET /admin/comments", adminPageAuth(adminPagePerm(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 获取查询参数
 		status := r.URL.Query().Get("status")
