@@ -377,6 +377,202 @@ func (h *CommentHandler) Reject(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "评论已拒绝"}, http.StatusOK)
 }
 
+// AdminListComments 获取评论列表（管理员）
+// GET /api/v1/admin/comments
+func (h *CommentHandler) AdminListComments(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// 获取查询参数
+	statusStr := r.URL.Query().Get("status")
+	pageStr := r.URL.Query().Get("page")
+	perPageStr := r.URL.Query().Get("per_page")
+
+	// 默认值
+	page := 1
+	perPage := 20
+	if pageStr != "" {
+		if p, err := parseInt(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+	if perPageStr != "" {
+		if p, err := parseInt(perPageStr); err == nil && p > 0 && p <= 100 {
+			perPage = p
+		}
+	}
+
+	// 解析状态
+	var status comment.CommentStatus
+	if statusStr != "" {
+		status = comment.CommentStatus(statusStr)
+		if !status.IsValid() {
+			WriteAPIError(w, "BAD_REQUEST", "无效的评论状态", nil, http.StatusBadRequest)
+			return
+		}
+	} else {
+		status = comment.StatusPending // 默认获取待审核评论
+	}
+
+	offset := (page - 1) * perPage
+	comments, total, err := h.commentService.GetCommentsByStatus(ctx, status, offset, perPage)
+	if err != nil {
+		WriteAPIError(w, "INTERNAL_ERROR", "获取评论列表失败", nil, http.StatusInternalServerError)
+		return
+	}
+
+	// 构建响应
+	responses := make([]CommentResponse, 0, len(comments))
+	for _, c := range comments {
+		responses = append(responses, toCommentResponse(c))
+	}
+
+	WriteJSON(w, AdminCommentListResponse{
+		Comments: responses,
+		Total:    total,
+		Page:     page,
+		PerPage:  perPage,
+	}, http.StatusOK)
+}
+
+// BatchApproveRequest 批量审核请求
+type BatchApproveRequest struct {
+	IDs []string `json:"ids"`
+}
+
+// BatchApprove 批量批准评论
+// PUT /api/v1/admin/comments/batch-approve
+func (h *CommentHandler) BatchApprove(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req BatchApproveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteAPIError(w, "BAD_REQUEST", "请求格式错误", nil, http.StatusBadRequest)
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		WriteAPIError(w, "VALIDATION_ERROR", "请选择要审核的评论", nil, http.StatusBadRequest)
+		return
+	}
+
+	ids := make([]uuid.UUID, 0, len(req.IDs))
+	for _, idStr := range req.IDs {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			WriteAPIError(w, "BAD_REQUEST", "无效的评论ID: "+idStr, nil, http.StatusBadRequest)
+			return
+		}
+		ids = append(ids, id)
+	}
+
+	if err := h.commentService.BatchApproveComments(ctx, ids); err != nil {
+		WriteAPIError(w, "INTERNAL_ERROR", "批量审核失败: "+err.Error(), nil, http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, map[string]string{"message": "批量审核成功"}, http.StatusOK)
+}
+
+// BatchReject 批量拒绝评论
+// PUT /api/v1/admin/comments/batch-reject
+func (h *CommentHandler) BatchReject(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req BatchApproveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteAPIError(w, "BAD_REQUEST", "请求格式错误", nil, http.StatusBadRequest)
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		WriteAPIError(w, "VALIDATION_ERROR", "请选择要审核的评论", nil, http.StatusBadRequest)
+		return
+	}
+
+	ids := make([]uuid.UUID, 0, len(req.IDs))
+	for _, idStr := range req.IDs {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			WriteAPIError(w, "BAD_REQUEST", "无效的评论ID: "+idStr, nil, http.StatusBadRequest)
+			return
+		}
+		ids = append(ids, id)
+	}
+
+	if err := h.commentService.BatchRejectComments(ctx, ids); err != nil {
+		WriteAPIError(w, "INTERNAL_ERROR", "批量拒绝失败: "+err.Error(), nil, http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, map[string]string{"message": "批量拒绝成功"}, http.StatusOK)
+}
+
+// BatchDelete 批量删除评论
+// DELETE /api/v1/admin/comments/batch-delete
+func (h *CommentHandler) BatchDelete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req BatchApproveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteAPIError(w, "BAD_REQUEST", "请求格式错误", nil, http.StatusBadRequest)
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		WriteAPIError(w, "VALIDATION_ERROR", "请选择要删除的评论", nil, http.StatusBadRequest)
+		return
+	}
+
+	ids := make([]uuid.UUID, 0, len(req.IDs))
+	for _, idStr := range req.IDs {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			WriteAPIError(w, "BAD_REQUEST", "无效的评论ID: "+idStr, nil, http.StatusBadRequest)
+			return
+		}
+		ids = append(ids, id)
+	}
+
+	if err := h.commentService.BatchDeleteComments(ctx, ids); err != nil {
+		WriteAPIError(w, "INTERNAL_ERROR", "批量删除失败: "+err.Error(), nil, http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, map[string]string{"message": "批量删除成功"}, http.StatusOK)
+}
+
+// AdminDeleteComment 管理员删除单条评论
+// DELETE /api/v1/admin/comments/{id}
+func (h *CommentHandler) AdminDeleteComment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := r.PathValue("id")
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		WriteAPIError(w, "BAD_REQUEST", "无效的评论ID", nil, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.commentService.DeleteCommentAdmin(ctx, id); err != nil {
+		if errors.Is(err, comment.ErrCommentNotFound) {
+			WriteAPIError(w, "NOT_FOUND", "评论不存在", nil, http.StatusNotFound)
+			return
+		}
+		WriteAPIError(w, "INTERNAL_ERROR", "删除评论失败", nil, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// AdminCommentListResponse 管理员评论列表响应
+type AdminCommentListResponse struct {
+	Comments []CommentResponse `json:"comments"`
+	Total    int               `json:"total"`
+	Page     int               `json:"page"`
+	PerPage  int               `json:"per_page"`
+}
+
 // toCommentResponse 转换评论为响应格式
 func toCommentResponse(c *comment.Comment) CommentResponse {
 	return CommentResponse{

@@ -224,3 +224,65 @@ func GetRequestID() string {
 	// TODO: 实现实际的请求 ID 生成逻辑
 	return uuid.New().String()
 }
+
+// AdminMiddleware 管理员权限检查中间件
+// 需要先通过 AuthMiddleware 或 AuthMiddlewareWithBlacklist 验证用户身份
+func AdminMiddleware(permCache *auth.PermissionCache) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+
+			// 获取用户角色 ID
+			roleID, err := GetUserRoleID(ctx)
+			if err != nil {
+				WriteAPIError(w, "AUTH_FAILED", "未授权访问", nil, http.StatusUnauthorized)
+				return
+			}
+
+			// 检查是否有管理员权限（admin:access）
+			hasPerm, err := permCache.GetPermission(ctx, roleID, "admin:access")
+			if err != nil {
+				WriteAPIError(w, "INTERNAL_ERROR", "权限检查失败", nil, http.StatusInternalServerError)
+				return
+			}
+
+			if !hasPerm {
+				WriteAPIError(w, "PERMISSION_DENIED", "需要管理员权限", nil, http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequirePermissionMiddleware 通用权限检查中间件
+// 检查用户是否拥有指定权限
+func RequirePermissionMiddleware(permCache *auth.PermissionCache, permission string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+
+			// 获取用户角色 ID
+			roleID, err := GetUserRoleID(ctx)
+			if err != nil {
+				WriteAPIError(w, "AUTH_FAILED", "未授权访问", nil, http.StatusUnauthorized)
+				return
+			}
+
+			// 检查权限
+			hasPerm, err := permCache.GetPermission(ctx, roleID, permission)
+			if err != nil {
+				WriteAPIError(w, "INTERNAL_ERROR", "权限检查失败", nil, http.StatusInternalServerError)
+				return
+			}
+
+			if !hasPerm {
+				WriteAPIError(w, "PERMISSION_DENIED", "权限不足", nil, http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
