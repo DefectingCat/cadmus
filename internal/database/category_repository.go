@@ -310,3 +310,17 @@ func (r *CategoryRepository) scanCategoryFromRow(row pgx.Rows) (*post.Category, 
 	}
 	return category, nil
 }
+
+// UpdateOrder 批量更新分类排序
+func (r *CategoryRepository) UpdateOrder(ctx context.Context, order []uuid.UUID) error {
+	query := `UPDATE categories SET sort_order = $2 WHERE id = $1`
+
+	for i, id := range order {
+		_, err := r.pool.Exec(ctx, query, id, i)
+		if err != nil {
+			return fmt.Errorf("failed to update category order: %w", err)
+		}
+	}
+
+	return nil
+}

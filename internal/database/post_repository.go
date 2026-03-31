@@ -650,3 +650,48 @@ func (r *PostLikeRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 	}
 	return likes, nil
 }
+
+// CountByAuthor 统计作者的文章数量
+func (r *PostRepository) CountByAuthor(ctx context.Context, authorID uuid.UUID) (int, error) {
+	query := `SELECT COUNT(*) FROM posts WHERE author_id = $1`
+
+	var count int
+	err := r.pool.QueryRow(ctx, query, authorID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count posts by author: %w", err)
+	}
+
+	return count, nil
+}
+
+// MoveCategory 移动文章到指定分类
+func (r *PostRepository) MoveCategory(ctx context.Context, postID, categoryID uuid.UUID) error {
+	query := `UPDATE posts SET category_id = $2 WHERE id = $1`
+
+	result, err := r.pool.Exec(ctx, query, postID, categoryID)
+	if err != nil {
+		return fmt.Errorf("failed to move post category: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return post.ErrPostNotFound
+	}
+
+	return nil
+}
+
+// ChangeStatus 更改文章状态
+func (r *PostRepository) ChangeStatus(ctx context.Context, postID uuid.UUID, status string) error {
+	query := `UPDATE posts SET status = $2 WHERE id = $1`
+
+	result, err := r.pool.Exec(ctx, query, postID, status)
+	if err != nil {
+		return fmt.Errorf("failed to change post status: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return post.ErrPostNotFound
+	}
+
+	return nil
+}

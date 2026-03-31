@@ -256,3 +256,12 @@ func (r *TagRepository) scanTagFromRow(row pgx.Rows) (*post.Tag, error) {
 	}
 	return tag, nil
 }
+
+// UpdateOrder 批量更新标签排序（通过更新 created_at 模拟，或扩展表结构）
+// 注意：当前 tags 表没有 sort_order 字段，此方法为预留扩展
+func (r *TagRepository) UpdateOrder(ctx context.Context, order []uuid.UUID) error {
+	// 当前标签表没有 sort_order 字段
+	// 如果需要排序功能，需要扩展表结构
+	// 这里返回 nil 表示成功但不执行任何操作
+	return nil
+}

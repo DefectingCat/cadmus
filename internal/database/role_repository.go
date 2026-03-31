@@ -186,3 +186,99 @@ func (r *RoleRepository) scanRoleFromRow(row pgx.Rows) (*user.Role, error) {
 	}
 	return role, nil
 }
+
+// Create 创建新角色
+func (r *RoleRepository) Create(ctx context.Context, name, displayName string, isDefault bool) (uuid.UUID, error) {
+	id := uuid.New()
+	query := `
+		INSERT INTO roles (id, name, display_name, is_default, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
+	`
+
+	_, err := r.pool.Exec(ctx, query, id, name, displayName, isDefault)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to create role: %w", err)
+	}
+
+	return id, nil
+}
+
+// UpdateDisplayName 更新角色显示名称
+func (r *RoleRepository) UpdateDisplayName(ctx context.Context, id uuid.UUID, displayName string) error {
+	query := `UPDATE roles SET display_name = $2 WHERE id = $1`
+
+	result, err := r.pool.Exec(ctx, query, id, displayName)
+	if err != nil {
+		return fmt.Errorf("failed to update role display name: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return user.ErrRoleNotFound
+	}
+
+	return nil
+}
+
+// SetPermissions 设置角色权限（替换现有权限）
+func (r *RoleRepository) SetPermissions(ctx context.Context, roleID uuid.UUID, permissionIDs []uuid.UUID) error {
+	// 使用事务
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// 删除现有权限
+	_, err = tx.Exec(ctx, "DELETE FROM role_permissions WHERE role_id = $1", roleID)
+	if err != nil {
+		return fmt.Errorf("failed to clear role permissions: %w", err)
+	}
+
+	// 插入新权限
+	if len(permissionIDs) > 0 {
+		query := `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)`
+		for _, permID := range permissionIDs {
+			_, err = tx.Exec(ctx, query, roleID, permID)
+			if err != nil {
+				return fmt.Errorf("failed to add role permission: %w", err)
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+// GetUserCount 获取使用该角色的用户数量
+func (r *RoleRepository) GetUserCount(ctx context.Context, roleID uuid.UUID) (int, error) {
+	query := `SELECT COUNT(*) FROM users WHERE role_id = $1`
+
+	var count int
+	err := r.pool.QueryRow(ctx, query, roleID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users with role: %w", err)
+	}
+
+	return count, nil
+}
+
+// Delete 删除角色
+func (r *RoleRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	// 先删除角色权限关联
+	_, err := r.pool.Exec(ctx, "DELETE FROM role_permissions WHERE role_id = $1", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete role permissions: %w", err)
+	}
+
+	// 删除角色
+	query := `DELETE FROM roles WHERE id = $1`
+	result, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete role: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return user.ErrRoleNotFound
+	}
+
+	return nil
+}
