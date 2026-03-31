@@ -5,6 +5,8 @@
   "scripts": {
     "build": "esbuild src/main.ts --bundle --outdir=../static/dist --minify --format=esm",
     "build:editor": "esbuild src/editor/index.ts --bundle --outdir=../static/dist/editor.js --minify",
+    "build:admin-media": "esbuild src/admin/media/index.ts --bundle --outdir=../static/dist/admin-media.js --minify",
+    "build:admin-comments": "esbuild src/admin/comments/list.ts --bundle --outdir=../static/dist/admin/comments.js --minify",
     "build:css": "bunx @tailwindcss/cli -i src/styles/main.css -o ../static/dist/styles.css --minify",
     "dev": "esbuild src/main.ts --bundle --outdir=../static/dist --watch --sourcemap=inline --format=esm",
     "dev:css": "bunx @tailwindcss/cli -i src/styles/main.css -o ../static/dist/styles.css --watch",
