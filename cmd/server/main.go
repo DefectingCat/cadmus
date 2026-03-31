@@ -13,11 +13,13 @@ import (
 	"rua.plus/cadmus/internal/api/handlers"
 	"rua.plus/cadmus/internal/auth"
 	"rua.plus/cadmus/internal/cache"
+	"rua.plus/cadmus/internal/core/comment"
 	"rua.plus/cadmus/internal/core/rss"
 	"rua.plus/cadmus/internal/database"
 	"rua.plus/cadmus/internal/services"
 	_ "rua.plus/cadmus/plugins/mermaid-block" // 启用 Mermaid 图表块插件（blank import 触发 init）
 	"rua.plus/cadmus/web/templates/pages"
+	adminpages "rua.plus/cadmus/web/templates/pages/admin"
 
 	// 启用默认主题（blank import 触发 init()）
 	_ "rua.plus/cadmus/themes/default"
@@ -150,6 +152,16 @@ func main() {
 	searchHandler := handlers.NewSearchHandler(serviceContainer.SearchService)
 	log.Println("Search handlers initialized")
 
+	// 初始化管理员处理器
+	adminHandler := handlers.NewAdminHandler(
+		userRepo, roleRepo, permRepo,
+		postRepo, categoryRepo, tagRepo, commentRepo,
+		serviceContainer.UserService,
+		jwtService,
+		permCache,
+	)
+	log.Println("Admin handlers initialized")
+
 	// 创建路由
 	mux := http.NewServeMux()
 
@@ -207,6 +219,13 @@ func main() {
 	mux.HandleFunc("PUT /api/v1/comments/{id}/approve", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.Approve)).ServeHTTP)
 	mux.HandleFunc("PUT /api/v1/comments/{id}/reject", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.Reject)).ServeHTTP)
 
+	// 评论管理后台 API（需 comment:moderate 权限）
+	mux.HandleFunc("GET /api/v1/admin/comments", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.AdminListComments)).ServeHTTP)
+	mux.HandleFunc("PUT /api/v1/admin/comments/batch-approve", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.BatchApprove)).ServeHTTP)
+	mux.HandleFunc("PUT /api/v1/admin/comments/batch-reject", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.BatchReject)).ServeHTTP)
+	mux.HandleFunc("DELETE /api/v1/admin/comments/batch-delete", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.BatchDelete)).ServeHTTP)
+	mux.HandleFunc("DELETE /api/v1/admin/comments/{id}", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.AdminDeleteComment)).ServeHTTP)
+
 	// 媒体 API（需认证）
 	mux.HandleFunc("POST /api/v1/media/upload", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Upload)).ServeHTTP)
 	mux.HandleFunc("DELETE /api/v1/media/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Delete)).ServeHTTP)
@@ -216,6 +235,26 @@ func main() {
 	// RSS 订阅 API（公开）
 	mux.HandleFunc("GET /api/v1/rss", rssHandler.Feed)
 
+	// 管理员 API（需认证和管理员权限）
+	adminAuth := handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)
+	adminPerm := handlers.AdminMiddleware(permCache)
+
+	// 角色管理
+	mux.HandleFunc("GET /api/v1/admin/roles", adminAuth(adminPerm(http.HandlerFunc(adminHandler.ListRoles))).ServeHTTP)
+	mux.HandleFunc("POST /api/v1/admin/roles", adminAuth(adminPerm(http.HandlerFunc(adminHandler.CreateRole))).ServeHTTP)
+	mux.HandleFunc("PUT /api/v1/admin/roles/{id}", adminAuth(adminPerm(http.HandlerFunc(adminHandler.UpdateRole))).ServeHTTP)
+	mux.HandleFunc("DELETE /api/v1/admin/roles/{id}", adminAuth(adminPerm(http.HandlerFunc(adminHandler.DeleteRole))).ServeHTTP)
+
+	// 用户管理
+	mux.HandleFunc("GET /api/v1/admin/users", adminAuth(adminPerm(http.HandlerFunc(adminHandler.ListUsers))).ServeHTTP)
+	mux.HandleFunc("PUT /api/v1/admin/users/{id}/ban", adminAuth(adminPerm(http.HandlerFunc(adminHandler.BanUser))).ServeHTTP)
+
+	// 批量操作
+	mux.HandleFunc("POST /api/v1/admin/batch", adminAuth(adminPerm(http.HandlerFunc(adminHandler.BatchOperation))).ServeHTTP)
+
+	// 排序更新
+	mux.HandleFunc("PUT /api/v1/admin/order", adminAuth(adminPerm(http.HandlerFunc(adminHandler.UpdateOrder))).ServeHTTP)
+
 	// 健康检查端点
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -224,6 +263,34 @@ func main() {
 
 	// 首页
 	mux.Handle("/", templ.Handler(pages.HomePage("Cadmus - 博客平台")))
+
+	// 管理后台页面（需要认证和管理员权限）
+	adminPageAuth := handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)
+	adminPagePerm := handlers.AdminMiddleware(permCache)
+	mux.Handle("GET /admin/comments", adminPageAuth(adminPagePerm(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 获取查询参数
+		status := r.URL.Query().Get("status")
+		if status == "" {
+			status = "pending"
+		}
+		pageStr := r.URL.Query().Get("page")
+		page := 1
+		if pageStr != "" {
+			if p, err := parseIntStr(pageStr); err == nil && p > 0 {
+				page = p
+			}
+		}
+		perPage := 20
+
+		// 获取评论列表
+		comments, total, err := serviceContainer.CommentService.GetCommentsByStatus(r.Context(), comment.CommentStatus(status), (page-1)*perPage, perPage)
+		if err != nil {
+			http.Error(w, "获取评论失败", http.StatusInternalServerError)
+			return
+		}
+
+		templ.Handler(adminpages.AdminCommentsPage("评论管理 - Cadmus", status, comments, page, perPage, total)).ServeHTTP(w, r)
+	}))))
 
 	// 静态文件服务
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
@@ -281,5 +348,18 @@ func atoi(s string) int {
 		}
 	}
 	return n
+}
+
+// parseIntStr 解析整数字符串
+func parseIntStr(s string) (int, error) {
+	var n int
+	for _, c := range s {
+		if c >= '0' && c <= '9' {
+			n = n*10 + int(c-'0')
+		} else {
+			return 0, nil
+		}
+	}
+	return n, nil
 }
 

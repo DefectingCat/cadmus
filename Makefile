@@ -1,37 +1,16 @@
-# Makefile - Multi-process parallel development mode
-# Per docs/design.md Section 11.2
+# Makefile - Build commands
 
-.PHONY: live live/templ live/server live/esbuild live/tailwind build build/frontend
+.PHONY: build build/frontend build/backend build/editor
 
-# Simultaneously start all development processes
-live:
-	@make -j4 live/templ live/server live/esbuild live/tailwind
+# Build all (frontend + backend)
+build:
+	@make build/frontend build/backend
 
-# templ watch mode (generate Go code)
-live/templ:
-	templ generate --watch --proxy="http://localhost:8080" --open-browser=false
+# Build backend Go server
+build/backend:
+	go build -o bin/server ./cmd/server
 
-# Go server (using air hot reload)
-live/server:
-	air -c .air.toml
-
-# esbuild bundle TypeScript
-live/esbuild:
-	cd web/frontend && bun esbuild src/main.ts \
-		--bundle \
-		--outdir=../static/dist \
-		--watch \
-		--sourcemap=inline \
-		--format=esm
-
-# Tailwind CSS compilation
-live/tailwind:
-	cd web/frontend && bun @tailwindcss/cli \
-		-i src/styles/main.css \
-		-o ../static/dist/styles.css \
-		--watch
-
-# Production build
+# Build frontend assets
 build/frontend:
 	cd web/frontend && bun esbuild src/main.ts \
 		--bundle \
@@ -50,9 +29,3 @@ build/editor:
 		--outdir=../static/dist/editor.js \
 		--minify
 
-live/editor:
-	cd web/frontend && bun esbuild src/editor/index.ts \
-		--bundle \
-		--outdir=../static/dist/editor.js \
-		--watch \
-		--sourcemap=inline
