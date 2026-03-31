@@ -1,0 +1,264 @@
+package admin
+
+import (
+	"rua.plus/cadmus/internal/core/post"
+	"rua.plus/cadmus/internal/core/comment"
+	"rua.plus/cadmus/web/templates/layouts"
+)
+
+// DashboardPage 仪表盘页面
+templ DashboardPage(stats DashboardStats, recentPosts []*post.Post, recentComments []*comment.Comment, pendingComments int) {
+	@layouts.AdminLayout("仪表盘", "dashboard") {
+		<!-- 统计卡片 -->
+		<div class="stats-grid">
+			<div class="stat-card animate-fade-in-up stagger-1">
+				<div class="stat-icon">
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+					</svg>
+				</div>
+				<div class="stat-value">{ stats.TotalPosts }</div>
+				<div class="stat-label">文章总数</div>
+				if stats.PostsChange != 0 {
+					<div class={ "stat-change", templ.KV("positive", stats.PostsChange > 0), templ.KV("negative", stats.PostsChange < 0) }>
+						if stats.PostsChange > 0 {
+							<svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+							</svg>
+							<span>+{ stats.PostsChange } 本周</span>
+						} else {
+							<svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+							</svg>
+							<span>{ stats.PostsChange } 本周</span>
+						}
+					</div>
+				}
+			</div>
+
+			<div class="stat-card animate-fade-in-up stagger-2">
+				<div class="stat-icon">
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+					</svg>
+				</div>
+				<div class="stat-value">{ stats.TotalViews }</div>
+				<div class="stat-label">总浏览量</div>
+				<div class={ "stat-change", templ.KV("positive", stats.ViewsChange > 0) }>
+					if stats.ViewsChange > 0 {
+						<svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+						</svg>
+						<span>+{ stats.ViewsChange }% 本周</span>
+					}
+				</div>
+			</div>
+
+			<div class="stat-card animate-fade-in-up stagger-3">
+				<div class="stat-icon">
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+					</svg>
+				</div>
+				<div class="stat-value">{ stats.TotalComments }</div>
+				<div class="stat-label">评论总数</div>
+				if pendingComments > 0 {
+					<div class="stat-change negative">
+						<span>{ pendingComments } 待审核</span>
+					</div>
+				}
+			</div>
+
+			<div class="stat-card animate-fade-in-up stagger-4">
+				<div class="stat-icon">
+					<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+					</svg>
+				</div>
+				<div class="stat-value">{ stats.TotalUsers }</div>
+				<div class="stat-label">用户总数</div>
+				<div class={ "stat-change", templ.KV("positive", stats.UsersChange > 0) }>
+					if stats.UsersChange > 0 {
+						<svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+						</svg>
+						<span>+{ stats.UsersChange } 本周</span>
+					}
+				</div>
+			</div>
+		</div>
+
+		<!-- 主内容区 -->
+		<div class="dashboard-grid">
+			<!-- 快捷操作 -->
+			<div class="grid-span-4 animate-fade-in-up stagger-2">
+				<div class="card">
+					<div class="card-header">
+						<h3 class="card-title">快捷操作</h3>
+					</div>
+					<div class="card-body">
+						<div class="quick-actions">
+							<a href="/admin/posts/new" class="quick-action">
+								<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"></path>
+								</svg>
+								<span class="quick-action-label">新建文章</span>
+							</a>
+							<a href="/admin/media" class="quick-action">
+								<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+								</svg>
+								<span class="quick-action-label">上传媒体</span>
+							</a>
+							<a href="/admin/comments" class="quick-action">
+								<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+								</svg>
+								<span class="quick-action-label">审核评论</span>
+							</a>
+							<a href="/admin/settings" class="quick-action">
+								<svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+								</svg>
+								<span class="quick-action-label">系统设置</span>
+							</a>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- 最近文章 -->
+			<div class="grid-span-8 animate-fade-in-up stagger-3">
+				<div class="card">
+					<div class="card-header">
+						<h3 class="card-title">最近文章</h3>
+						<a href="/admin/posts" class="btn btn-ghost btn-sm">查看全部</a>
+					</div>
+					<div class="card-body" style="padding: 0;">
+						<table class="data-table">
+							<thead>
+								<tr>
+									<th>标题</th>
+									<th>状态</th>
+									<th>浏览</th>
+									<th>发布时间</th>
+								</tr>
+							</thead>
+							<tbody>
+								if len(recentPosts) == 0 {
+									<tr>
+										<td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">
+											暂无文章，开始创作吧
+										</td>
+									</tr>
+								} else {
+									for _, p := range recentPosts {
+										<tr>
+											<td>
+												<a href="/admin/posts/{ p.ID.String() }/edit" style="color: var(--text-primary); text-decoration: none;">
+													{ p.Title }
+												</a>
+											</td>
+											<td>
+												@PostStatusLabel(p.Status)
+											</td>
+											<td style="color: var(--text-secondary);">{ p.ViewCount }</td>
+											<td style="color: var(--text-muted); font-size: 0.8rem;">
+												{ p.CreatedAt.Format("2006-01-02") }
+											</td>
+										</tr>
+									}
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+
+			<!-- 最近评论 -->
+			<div class="grid-span-6 animate-fade-in-up stagger-4">
+				<div class="card">
+					<div class="card-header">
+						<h3 class="card-title">最近评论</h3>
+						<a href="/admin/comments" class="btn btn-ghost btn-sm">查看全部</a>
+					</div>
+					<div class="card-body">
+						if len(recentComments) == 0 {
+							<div style="text-align: center; color: var(--text-muted); padding: 24px;">
+								暂无评论
+							</div>
+						} else {
+							for _, c := range recentComments {
+								<div class="activity-item">
+									<div class="activity-icon">
+										<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+										</svg>
+									</div>
+									<div class="activity-content">
+										<div class="activity-title">
+											<strong>用户</strong>
+											<span style="color: var(--text-muted);"> 评论了文章</span>
+										</div>
+										<div class="activity-meta">
+											{ c.CreatedAt.Format("2006-01-02 15:04") }
+											if c.Status == comment.StatusPending {
+												<span class="status-badge" style="margin-left: 8px; background: rgba(212, 168, 75, 0.1); color: var(--warning); border-color: rgba(212, 168, 75, 0.2);">待审核</span>
+											}
+										</div>
+									</div>
+								</div>
+							}
+						}
+					</div>
+				</div>
+			</div>
+
+			<!-- 系统状态 -->
+			<div class="grid-span-6 animate-fade-in-up stagger-5">
+				<div class="card">
+					<div class="card-header">
+						<h3 class="card-title">系统状态</h3>
+					</div>
+					<div class="card-body">
+						<div style="display: grid; gap: 16px;">
+							<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(201, 64, 67, 0.02);">
+								<span style="color: var(--text-secondary);">数据库</span>
+								<span class="status-badge published">正常</span>
+							</div>
+							<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(201, 64, 67, 0.02);">
+								<span style="color: var(--text-secondary);">缓存服务</span>
+								<span class="status-badge published">正常</span>
+							</div>
+							<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(201, 64, 67, 0.02);">
+								<span style="color: var(--text-secondary);">存储空间</span>
+								<span style="color: var(--text-muted); font-size: 0.85rem;">{ stats.StorageUsed } / { stats.StorageTotal }</span>
+							</div>
+							<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0;">
+								<span style="color: var(--text-secondary);">活跃主题</span>
+								<span style="color: var(--accent-primary); font-size: 0.85rem;">{ stats.ActiveTheme }</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// DashboardStats 仪表盘统计数据
+type DashboardStats struct {
+	TotalPosts      int
+	PostsChange     int
+	TotalViews      int
+	ViewsChange     int
+	TotalComments   int
+	CommentsChange  int
+	TotalUsers      int
+	UsersChange     int
+	StorageUsed     string
+	StorageTotal    string
+	ActiveTheme     string
+	ActivePlugins   int
+}
