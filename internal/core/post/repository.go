@@ -50,6 +50,9 @@ type PostRepository interface {
 
 	// GetVersions 获取文章版本历史
 	GetVersions(ctx context.Context, postID uuid.UUID) ([]*PostVersion, error)
+
+	// GetVersionByNumber 根据版本号获取特定版本
+	GetVersionByNumber(ctx context.Context, postID uuid.UUID, version int) (*PostVersion, error)
 }
 
 // CategoryRepository 分类数据访问接口
@@ -137,4 +140,24 @@ type SeriesRepository interface {
 
 	// GetAll 获取所有系列
 	GetAll(ctx context.Context) ([]*Series, error)
+}
+
+// PostLikeRepository 文章点赞仓库接口
+type PostLikeRepository interface {
+	// CreateIfNotExists 创建点赞记录（使用 ON CONFLICT DO NOTHING），返回是否实际创建
+	// 同时原子更新文章的点赞计数
+	CreateIfNotExists(ctx context.Context, postID, userID uuid.UUID) (created bool, err error)
+
+	// DeleteIfExists 删除点赞记录（返回是否实际删除）
+	// 同时原子更新文章的点赞计数
+	DeleteIfExists(ctx context.Context, postID, userID uuid.UUID) (deleted bool, err error)
+
+	// Exists 检查用户是否已点赞文章
+	Exists(ctx context.Context, postID, userID uuid.UUID) (bool, error)
+
+	// CountByPostID 统计文章的点赞数量
+	CountByPostID(ctx context.Context, postID uuid.UUID) (int, error)
+
+	// GetByUserID 获取用户的所有点赞记录
+	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*PostLike, error)
 }

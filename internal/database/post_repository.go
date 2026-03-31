@@ -413,6 +413,33 @@ func (r *PostRepository) GetVersions(ctx context.Context, postID uuid.UUID) ([]*
 	return versions, nil
 }
 
+// GetVersionByNumber 根据版本号获取特定版本
+func (r *PostRepository) GetVersionByNumber(ctx context.Context, postID uuid.UUID, version int) (*post.PostVersion, error) {
+	query := `
+		SELECT id, post_id, version, content, creator_id, note, created_at
+		FROM post_versions WHERE post_id = $1 AND version = $2
+	`
+
+	v := &post.PostVersion{}
+	err := r.pool.QueryRow(ctx, query, postID, version).Scan(
+		&v.ID,
+		&v.PostID,
+		&v.Version,
+		&v.Content,
+		&v.CreatorID,
+		&v.Note,
+		&v.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, post.ErrVersionNotFound
+		}
+		return nil, fmt.Errorf("failed to get post version: %w", err)
+	}
+
+	return v, nil
+}
+
 // scanPost 扫描单行文章数据
 func (r *PostRepository) scanPost(ctx context.Context, row pgx.Row) (*post.Post, error) {
 	p := &post.Post{
@@ -503,4 +530,123 @@ func (r *PostRepository) scanPostFromRow(row pgx.Rows) (*post.Post, error) {
 	p.SEOMeta.Keywords = seoKeywords
 
 	return p, nil
+}
+
+// PostLikeRepository 文章点赞仓库实现
+type PostLikeRepository struct {
+	pool *Pool
+}
+
+// NewPostLikeRepository 创建文章点赞仓库
+func NewPostLikeRepository(pool *Pool) *PostLikeRepository {
+	return &PostLikeRepository{pool: pool}
+}
+
+// CreateIfNotExists 创建点赞记录（使用 ON CONFLICT DO NOTHING），返回是否实际创建
+// 同时原子更新文章的点赞计数
+func (r *PostLikeRepository) CreateIfNotExists(ctx context.Context, postID, userID uuid.UUID) (created bool, err error) {
+	query := `
+		INSERT INTO post_likes (id, post_id, user_id, created_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (post_id, user_id) DO NOTHING
+	`
+
+	id := uuid.New()
+	now := time.Now()
+
+	result, err := r.pool.Exec(ctx, query, id, postID, userID, now)
+	if err != nil {
+		return false, fmt.Errorf("failed to create post like: %w", err)
+	}
+
+	created = result.RowsAffected() > 0
+
+	// 只有实际创建点赞记录时才更新计数
+	if created {
+		updateQuery := `UPDATE posts SET like_count = like_count + 1 WHERE id = $1`
+		_, err = r.pool.Exec(ctx, updateQuery, postID)
+		if err != nil {
+			return false, fmt.Errorf("failed to update like count: %w", err)
+		}
+	}
+
+	return created, nil
+}
+
+// DeleteIfExists 删除点赞记录（返回是否实际删除）
+// 同时原子更新文章的点赞计数
+func (r *PostLikeRepository) DeleteIfExists(ctx context.Context, postID, userID uuid.UUID) (deleted bool, err error) {
+	query := `DELETE FROM post_likes WHERE post_id = $1 AND user_id = $2`
+
+	result, err := r.pool.Exec(ctx, query, postID, userID)
+	if err != nil {
+		return false, fmt.Errorf("failed to delete post like: %w", err)
+	}
+
+	deleted = result.RowsAffected() > 0
+
+	// 只有实际删除点赞记录时才更新计数
+	if deleted {
+		updateQuery := `UPDATE posts SET like_count = like_count - 1 WHERE id = $1 AND like_count > 0`
+		_, err = r.pool.Exec(ctx, updateQuery, postID)
+		if err != nil {
+			return false, fmt.Errorf("failed to update like count: %w", err)
+		}
+	}
+
+	return deleted, nil
+}
+
+// Exists 检查用户是否已点赞文章
+func (r *PostLikeRepository) Exists(ctx context.Context, postID, userID uuid.UUID) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2)`
+
+	var exists bool
+	err := r.pool.QueryRow(ctx, query, postID, userID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check post like exists: %w", err)
+	}
+	return exists, nil
+}
+
+// CountByPostID 统计文章的点赞数量
+func (r *PostLikeRepository) CountByPostID(ctx context.Context, postID uuid.UUID) (int, error) {
+	query := `SELECT COUNT(*) FROM post_likes WHERE post_id = $1`
+
+	var count int
+	err := r.pool.QueryRow(ctx, query, postID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count post likes: %w", err)
+	}
+	return count, nil
+}
+
+// GetByUserID 获取用户的所有点赞记录
+func (r *PostLikeRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*post.PostLike, error) {
+	query := `
+		SELECT id, post_id, user_id, created_at
+		FROM post_likes WHERE user_id = $1 ORDER BY created_at DESC
+	`
+
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get post likes by user id: %w", err)
+	}
+	defer rows.Close()
+
+	likes := make([]*post.PostLike, 0)
+	for rows.Next() {
+		l := &post.PostLike{}
+		err := rows.Scan(
+			&l.ID,
+			&l.PostID,
+			&l.UserID,
+			&l.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan post like: %w", err)
+		}
+		likes = append(likes, l)
+	}
+	return likes, nil
 }

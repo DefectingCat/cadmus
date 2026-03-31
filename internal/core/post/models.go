@@ -104,6 +104,14 @@ type PostVersion struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// PostLike 文章点赞实体
+type PostLike struct {
+	ID        uuid.UUID `json:"id"`
+	PostID    uuid.UUID `json:"post_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // PostListFilters 文章列表筛选条件
 type PostListFilters struct {
 	Status     PostStatus
@@ -125,6 +133,8 @@ var (
 	ErrVersionNotFound  = &PostError{Code: "version_not_found", Message: "版本不存在"}
 	ErrPermissionDenied = &PostError{Code: "permission_denied", Message: "权限不足"}
 	ErrPaidContent      = &PostError{Code: "paid_content", Message: "此为付费内容，请先购买"}
+	ErrAlreadyLiked     = &PostError{Code: "already_liked", Message: "已点赞过该文章"}
+	ErrNotLiked         = &PostError{Code: "not_liked", Message: "未点赞过该文章"}
 )
 
 // PostError 文章模块自定义错误

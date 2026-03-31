@@ -29,6 +29,9 @@ type PostService interface {
 	// List 分页获取文章列表
 	List(ctx context.Context, filters post.PostListFilters, page, pageSize int) ([]*post.Post, int, error)
 
+	// GetByAuthor 获取用户的文章列表，支持状态筛选
+	GetByAuthor(ctx context.Context, authorID uuid.UUID, status post.PostStatus, page, pageSize int) ([]*post.Post, int, error)
+
 	// Search 全文搜索
 	Search(ctx context.Context, query string, page, pageSize int) ([]*post.Post, int, error)
 
@@ -49,6 +52,15 @@ type PostService interface {
 
 	// IncrementViewCount 增加浏览量
 	IncrementViewCount(ctx context.Context, id uuid.UUID) error
+
+	// LikePost 点赞文章
+	LikePost(ctx context.Context, postID, userID uuid.UUID) error
+
+	// UnlikePost 取消点赞
+	UnlikePost(ctx context.Context, postID, userID uuid.UUID) error
+
+	// IsPostLiked 检查用户是否已点赞文章
+	IsPostLiked(ctx context.Context, postID, userID uuid.UUID) (bool, error)
 }
 
 // postServiceImpl 文章服务实现
@@ -57,6 +69,7 @@ type postServiceImpl struct {
 	categoryRepo post.CategoryRepository
 	tagRepo      post.TagRepository
 	seriesRepo   post.SeriesRepository
+	likeRepo     post.PostLikeRepository
 }
 
 // NewPostService 创建文章服务
@@ -71,6 +84,23 @@ func NewPostService(
 		categoryRepo: categoryRepo,
 		tagRepo:      tagRepo,
 		seriesRepo:   seriesRepo,
+	}
+}
+
+// NewPostServiceWithLikes 创建文章服务（带点赞功能）
+func NewPostServiceWithLikes(
+	postRepo post.PostRepository,
+	categoryRepo post.CategoryRepository,
+	tagRepo post.TagRepository,
+	seriesRepo post.SeriesRepository,
+	likeRepo post.PostLikeRepository,
+) PostService {
+	return &postServiceImpl{
+		postRepo:     postRepo,
+		categoryRepo: categoryRepo,
+		tagRepo:      tagRepo,
+		seriesRepo:   seriesRepo,
+		likeRepo:     likeRepo,
 	}
 }
 
@@ -162,6 +192,15 @@ func (s *postServiceImpl) List(ctx context.Context, filters post.PostListFilters
 	return s.postRepo.List(ctx, filters, offset, pageSize)
 }
 
+// GetByAuthor 获取用户的文章列表，支持状态筛选
+func (s *postServiceImpl) GetByAuthor(ctx context.Context, authorID uuid.UUID, status post.PostStatus, page, pageSize int) ([]*post.Post, int, error) {
+	filters := post.PostListFilters{
+		AuthorID: authorID,
+		Status:   status,
+	}
+	return s.List(ctx, filters, page, pageSize)
+}
+
 // Search 全文搜索
 func (s *postServiceImpl) Search(ctx context.Context, query string, page, pageSize int) ([]*post.Post, int, error) {
 	if page < 1 {
@@ -233,21 +272,9 @@ func (s *postServiceImpl) Rollback(ctx context.Context, postID uuid.UUID, versio
 	}
 
 	// 获取指定版本
-	versions, err := s.postRepo.GetVersions(ctx, postID)
+	targetVersion, err := s.postRepo.GetVersionByNumber(ctx, postID, version)
 	if err != nil {
 		return err
-	}
-
-	var targetVersion *post.PostVersion
-	for _, v := range versions {
-		if v.Version == version {
-			targetVersion = v
-			break
-		}
-	}
-
-	if targetVersion == nil {
-		return post.ErrVersionNotFound
 	}
 
 	// 恢复内容
@@ -258,6 +285,51 @@ func (s *postServiceImpl) Rollback(ctx context.Context, postID uuid.UUID, versio
 // IncrementViewCount 增加浏览量
 func (s *postServiceImpl) IncrementViewCount(ctx context.Context, id uuid.UUID) error {
 	return s.postRepo.IncrementViewCount(ctx, id)
+}
+
+// LikePost 点赞文章
+func (s *postServiceImpl) LikePost(ctx context.Context, postID, userID uuid.UUID) error {
+	// 检查文章是否存在
+	_, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return post.ErrPostNotFound
+	}
+
+	// 使用原子操作创建点赞记录并更新计数
+	created, err := s.likeRepo.CreateIfNotExists(ctx, postID, userID)
+	if err != nil {
+		return err
+	}
+	if !created {
+		return post.ErrAlreadyLiked
+	}
+
+	return nil
+}
+
+// UnlikePost 取消点赞
+func (s *postServiceImpl) UnlikePost(ctx context.Context, postID, userID uuid.UUID) error {
+	// 检查文章是否存在
+	_, err := s.postRepo.GetByID(ctx, postID)
+	if err != nil {
+		return post.ErrPostNotFound
+	}
+
+	// 使用原子操作删除点赞记录并更新计数
+	deleted, err := s.likeRepo.DeleteIfExists(ctx, postID, userID)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return post.ErrNotLiked
+	}
+
+	return nil
+}
+
+// IsPostLiked 检查用户是否已点赞文章
+func (s *postServiceImpl) IsPostLiked(ctx context.Context, postID, userID uuid.UUID) (bool, error) {
+	return s.likeRepo.Exists(ctx, postID, userID)
 }
 
 // CategoryService 分类服务接口
