@@ -1,0 +1,274 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/google/uuid"
+	"rua.plus/cadmus/internal/core/media"
+)
+
+// MediaPageData 媒体页面数据
+type MediaPageData struct {
+	Title    string
+	Medias   []*media.Media
+	Total    int
+	Page     int
+	PerPage  int
+	UserID   uuid.UUID
+}
+
+// AdminMediaPage 媒体库管理页面
+templ AdminMediaPage(data MediaPageData) {
+	<!DOCTYPE html>
+	<html lang="zh-CN">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ data.Title }</title>
+			<link rel="stylesheet" href="/static/dist/main.css"/>
+		</head>
+		<body class="min-h-screen bg-gray-100">
+			<!-- 顶部导航栏 -->
+			<header class="bg-white shadow-sm border-b border-gray-200">
+				<nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div class="flex justify-between h-16">
+						<div class="flex items-center">
+							<a href="/" class="text-xl font-bold text-gray-900">Cadmus Admin</a>
+						</div>
+						<div class="flex items-center space-x-4">
+							<a href="/admin/posts" class="text-gray-600 hover:text-gray-900">文章管理</a>
+							<a href="/admin/media" class="text-blue-600 font-medium">媒体库</a>
+							<a href="/admin/comments" class="text-gray-600 hover:text-gray-900">评论审核</a>
+							<a href="/admin/plugins" class="text-gray-600 hover:text-gray-900">插件</a>
+							<a href="/admin/themes" class="text-gray-600 hover:text-gray-900">主题</a>
+						</div>
+					</div>
+				</nav>
+			</header>
+
+			<!-- 主内容区 -->
+			<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+				<div class="mb-6">
+					<h1 class="text-2xl font-bold text-gray-900">媒体库</h1>
+					<p class="text-gray-500 mt-1">上传和管理图片、文档等媒体文件</p>
+				</div>
+
+				<!-- 工具栏 -->
+				<div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+					<div class="flex flex-col sm:flex-row gap-4 justify-between items-center">
+						<!-- 搜索和筛选 -->
+						<div class="flex gap-3 w-full sm:w-auto">
+							<input
+								type="text"
+								id="media-search"
+								placeholder="搜索文件名..."
+								class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-64"
+							/>
+							<select id="media-type-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+								<option value="">全部类型</option>
+								<option value="image">图片</option>
+								<option value="document">文档</option>
+								<option value="other">其他</option>
+							</select>
+						</div>
+
+						<!-- 操作按钮 -->
+						<div class="flex gap-3">
+							<button
+								id="upload-btn"
+								class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+							>
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+								</svg>
+								上传文件
+							</button>
+							<button
+								id="delete-selected-btn"
+								class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+								disabled
+							>
+								删除选中
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- 上传区域（拖拽上传） -->
+				<div id="upload-dropzone" class="bg-white rounded-lg shadow-sm p-8 mb-6 border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors hidden">
+					<div class="text-center">
+						<svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+						</svg>
+						<p class="text-gray-600 mb-2">拖拽文件到这里上传</p>
+						<p class="text-gray-400 text-sm">或点击下方选择文件</p>
+						<input type="file" id="file-input" multiple class="hidden" accept="image/*,.pdf,.doc,.docx,.txt"/>
+						<button id="select-file-btn" class="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+							选择文件
+						</button>
+						<p class="text-xs text-gray-400 mt-2">支持：JPEG, PNG, GIF, WebP, SVG, PDF, DOC, TXT（最大 10MB）</p>
+					</div>
+				</div>
+
+				<!-- 上传进度区域 -->
+				<div id="upload-progress" class="bg-white rounded-lg shadow-sm p-4 mb-6 hidden">
+					<h3 class="text-sm font-medium text-gray-700 mb-3">上传进度</h3>
+					<div id="upload-list" class="space-y-2"></div>
+				</div>
+
+				<!-- 媒体网格 -->
+				<div class="bg-white rounded-lg shadow-sm p-4">
+					<!-- 选择提示 -->
+					<div class="mb-4 flex items-center gap-2 text-sm text-gray-500">
+						<span id="selected-count">已选择 0 个文件</span>
+						<button id="clear-selection-btn" class="text-blue-600 hover:underline hidden">清除选择</button>
+					</div>
+
+					<!-- 网格视图 -->
+					if len(data.Medias) == 0 {
+						<div class="text-center py-12 text-gray-500">
+							<svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+							</svg>
+							<p>暂无媒体文件</p>
+							<p class="text-sm mt-1">点击上方"上传文件"按钮添加</p>
+						</div>
+					} else {
+						<div id="media-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+							for _, m := range data.Medias {
+								@MediaItem(m)
+							}
+						</div>
+					}
+
+					<!-- 分页 -->
+					if data.Total > data.PerPage {
+						<div class="mt-6 flex justify-center items-center gap-2">
+							if data.Page <= 1 {
+								<button
+									id="prev-page"
+									class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-400 cursor-not-allowed"
+									disabled
+								>
+									上一页
+								</button>
+							} else {
+								<button
+									id="prev-page"
+									class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+									data-page={ data.Page - 1 }
+								>
+									上一页
+								</button>
+							}
+							<span class="text-gray-600">第 { data.Page } 页</span>
+							if data.Page * data.PerPage >= data.Total {
+								<button
+									id="next-page"
+									class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-400 cursor-not-allowed"
+									disabled
+								>
+									下一页
+								</button>
+							} else {
+								<button
+									id="next-page"
+									class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+									data-page={ data.Page + 1 }
+								>
+									下一页
+								</button>
+							}
+						</div>
+					}
+				</div>
+			</main>
+
+			<!-- 媒体详情弹窗 -->
+			<div id="media-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+				<div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 overflow-hidden">
+					<div class="p-4 border-b border-gray-200 flex justify-between items-center">
+						<h3 id="modal-title" class="text-lg font-medium text-gray-900">媒体详情</h3>
+						<button id="close-modal" class="text-gray-400 hover:text-gray-600">
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+							</svg>
+						</button>
+					</div>
+					<div id="modal-content" class="p-4">
+						<!-- 动态内容 -->
+					</div>
+					<div class="p-4 border-t border-gray-200 flex justify-between">
+						<button id="insert-media-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+							插入到文章
+						</button>
+						<button id="delete-media-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+							删除
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- 后端数据注入 -->
+			<script>
+				window.mediaData = {
+					page: { data.Page },
+					perPage: { data.PerPage },
+					total: { data.Total },
+					userId: "{ data.UserID.String() }"
+				};
+			</script>
+			<script src="/static/dist/admin-media.js"></script>
+		</body>
+	</html>
+}
+
+// MediaItem 媒体项组件
+templ MediaItem(m *media.Media) {
+	<div
+		class="media-item relative group bg-gray-50 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
+		data-id={ m.ID.String() }
+		data-mime={ m.MimeType }
+		data-url={ m.URL }
+		data-name={ m.OriginalName }
+	>
+		<!-- 选择复选框 -->
+		<div class="absolute top-2 left-2 z-10">
+			<input
+				type="checkbox"
+				class="media-checkbox w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+				data-id={ m.ID.String() }
+			/>
+		</div>
+
+		<!-- 预览 -->
+		<div class="aspect-square flex items-center justify-center">
+			if media.IsImageMimeType(m.MimeType) {
+				<img src={ m.URL } alt={ m.OriginalName } class="object-cover w-full h-full"/>
+			} else {
+				<div class="flex flex-col items-center justify-center text-gray-400">
+					<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+					</svg>
+					<span class="text-xs mt-2 truncate max-w-full px-2">{ m.OriginalName }</span>
+				</div>
+			}
+		</div>
+
+		<!-- 文件信息 -->
+		<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 group-hover:from-black/80">
+			<p class="text-white text-xs truncate">{ m.OriginalName }</p>
+			<p class="text-gray-300 text-xs">{ formatFileSize(m.Size) }</p>
+		</div>
+	</div>
+}
+
+// formatFileSize 格式化文件大小
+func formatFileSize(size int64) string {
+	if size < 1024 {
+		return fmt.Sprintf("%d B", size)
+	} else if size < 1024*1024 {
+		return fmt.Sprintf("%d KB", size/1024)
+	} else {
+		return fmt.Sprintf("%d MB", size/1024/1024)
+	}
+}

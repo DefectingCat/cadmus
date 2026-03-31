@@ -1,0 +1,128 @@
+package admin
+
+// PluginInfo 插件信息
+type PluginInfo struct {
+	ID          string
+	Name        string
+	Version     string
+	Author      string
+	Description string
+	Enabled     bool
+}
+
+// AdminPluginsPage 插件管理页面（简化版）
+templ AdminPluginsPage(title string, plugins []PluginInfo) {
+	<!DOCTYPE html>
+	<html lang="zh-CN">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/static/dist/main.css"/>
+		</head>
+		<body class="min-h-screen bg-gray-100">
+			<!-- 顶部导航栏 -->
+			<header class="bg-white shadow-sm border-b border-gray-200">
+				<nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div class="flex justify-between h-16">
+						<div class="flex items-center">
+							<a href="/" class="text-xl font-bold text-gray-900">Cadmus Admin</a>
+						</div>
+						<div class="flex items-center space-x-4">
+							<a href="/admin/posts" class="text-gray-600 hover:text-gray-900">文章管理</a>
+							<a href="/admin/media" class="text-gray-600 hover:text-gray-900">媒体库</a>
+							<a href="/admin/comments" class="text-gray-600 hover:text-gray-900">评论审核</a>
+							<a href="/admin/plugins" class="text-blue-600 font-medium">插件</a>
+							<a href="/admin/themes" class="text-gray-600 hover:text-gray-900">主题</a>
+						</div>
+					</div>
+				</nav>
+			</header>
+
+			<!-- 主内容区 -->
+			<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+				<div class="mb-6">
+					<h1 class="text-2xl font-bold text-gray-900">插件管理</h1>
+					<p class="text-gray-500 mt-1">启用、禁用和配置系统插件</p>
+				</div>
+
+				<!-- 插件列表 -->
+				<div class="bg-white rounded-lg shadow-sm">
+					if len(plugins) == 0 {
+						<div class="text-center py-12 text-gray-500">
+							<svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+							</svg>
+							<p>暂无已安装插件</p>
+						</div>
+					} else {
+						<div class="divide-y divide-gray-200">
+							for _, p := range plugins {
+								@PluginItem(p)
+							}
+						</div>
+					}
+				</div>
+
+				<!-- 提示信息 -->
+				<div class="mt-6 bg-blue-50 rounded-lg p-4">
+					<div class="flex items-start gap-3">
+						<svg class="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+						<div>
+							<p class="text-blue-700 font-medium">插件开发说明</p>
+							<p class="text-blue-600 text-sm mt-1">Cadmus 使用编译时注册模式加载插件。如需添加新插件，请参考 docs/design.md 文档中的插件系统章节。</p>
+						</div>
+					</div>
+				</div>
+			</main>
+		</body>
+	</html>
+}
+
+// PluginItem 插件项组件
+templ PluginItem(p PluginInfo) {
+	<div class="p-4 flex items-center justify-between hover:bg-gray-50">
+		<div class="flex items-center gap-4">
+			<!-- 状态图标 -->
+			if p.Enabled {
+				<div class="w-3 h-3 rounded-full bg-green-500"></div>
+			} else {
+				<div class="w-3 h-3 rounded-full bg-gray-300"></div>
+			}
+
+			<!-- 插件信息 -->
+			<div>
+				<h3 class="text-sm font-medium text-gray-900">{ p.Name }</h3>
+				<p class="text-xs text-gray-500 mt-1">{ p.Description }</p>
+				<p class="text-xs text-gray-400 mt-1">版本 { p.Version } · { p.Author }</p>
+			</div>
+		</div>
+
+		<!-- 操作按钮 -->
+		<div class="flex items-center gap-3">
+			<!-- 开关 -->
+			<button
+				class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+				role="switch"
+				aria-checked={ p.Enabled }
+				data-plugin-id={ p.ID }
+			>
+				if p.Enabled {
+					<span class="translate-x-5 inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out bg-green-600"></span>
+				} else {
+					<span class="translate-x-0 inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out bg-gray-200"></span>
+				}
+			</button>
+
+			<!-- 配置按钮 -->
+			<button class="text-gray-400 hover:text-gray-600" title="配置">
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+				</svg>
+			</button>
+		</div>
+	</div>
+}

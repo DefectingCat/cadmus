@@ -1,0 +1,249 @@
+package admin
+
+import (
+	"rua.plus/cadmus/internal/core/post"
+)
+
+// calcTotalPages 计算总页数
+func calcTotalPages(total, pageSize int) int {
+	return (total + pageSize - 1) / pageSize
+}
+
+// PostListPage 文章管理列表页面
+templ PostListPage(posts []*post.Post, total int, page int, pageSize int, statuses []string, categories []*post.Category) {
+	<!DOCTYPE html>
+	<html lang="zh-CN">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>文章管理</title>
+			<link rel="stylesheet" href="/static/dist/main.css"/>
+		</head>
+		<body class="min-h-screen bg-gray-100">
+			<!-- 顶部导航栏 -->
+			<header class="bg-white shadow-sm border-b border-gray-200">
+				<nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div class="flex justify-between h-16">
+						<div class="flex items-center">
+							<a href="/" class="text-xl font-bold text-gray-900">Cadmus Admin</a>
+						</div>
+						<div class="flex items-center space-x-4">
+							<a href="/admin/posts" class="text-blue-600 font-medium">文章管理</a>
+							<a href="/admin/media" class="text-gray-600 hover:text-gray-900">媒体库</a>
+							<a href="/admin/comments" class="text-gray-600 hover:text-gray-900">评论审核</a>
+							<a href="/admin/plugins" class="text-gray-600 hover:text-gray-900">插件</a>
+							<a href="/admin/themes" class="text-gray-600 hover:text-gray-900">主题</a>
+						</div>
+					</div>
+				</nav>
+			</header>
+
+			<div class="px-6 py-4">
+			<!-- 页面标题和新建按钮 -->
+			<div class="flex justify-between items-center mb-6">
+				<h1 class="text-2xl font-bold text-gray-900">文章管理</h1>
+				<a href="/admin/posts/new" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+					新建文章
+				</a>
+			</div>
+
+			<!-- 搜索和筛选 -->
+			<div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+				<div class="flex gap-4">
+					<!-- 搜索框 -->
+					<div class="flex-1">
+						<input type="text" id="search-input" placeholder="搜索文章标题..."
+							class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+					</div>
+					<!-- 状态筛选 -->
+					<select id="status-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+						<option value="">全部状态</option>
+						for _, s := range statuses {
+							<option value={ s }>{ s }</option>
+						}
+					</select>
+					<!-- 分类筛选 -->
+					<select id="category-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+						<option value="">全部分类</option>
+						for _, c := range categories {
+							<option value={ c.ID.String() }>{ c.Name }</option>
+						}
+					</select>
+				</div>
+			</div>
+
+			<!-- 批量操作栏 -->
+			<div id="bulk-actions" class="hidden bg-blue-50 rounded-lg p-4 mb-4 flex items-center gap-4">
+				<span class="text-blue-800">已选择 <span id="selected-count">0</span> 篇文章</span>
+				<button id="bulk-publish" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+					批量发布
+				</button>
+				<button id="bulk-delete" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm">
+					批量删除
+				</button>
+				<button id="bulk-cancel" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">
+					取消选择
+				</button>
+			</div>
+
+			<!-- 加载状态 -->
+			<div id="loading-overlay" class="hidden fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+				<div class="flex items-center gap-2">
+					<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+					<span class="text-gray-600">加载中...</span>
+				</div>
+			</div>
+
+			<!-- 文章表格 -->
+			<div class="bg-white rounded-lg shadow-sm overflow-hidden">
+				<table class="w-full">
+					<thead class="bg-gray-50 border-b border-gray-200">
+						<tr>
+							<th class="px-4 py-3 text-left">
+								<input type="checkbox" id="select-all" class="rounded">
+							</th>
+							<th class="px-4 py-3 text-left text-sm font-medium text-gray-600">标题</th>
+							<th class="px-4 py-3 text-left text-sm font-medium text-gray-600">Slug</th>
+							<th class="px-4 py-3 text-left text-sm font-medium text-gray-600">状态</th>
+							<th class="px-4 py-3 text-left text-sm font-medium text-gray-600">浏览</th>
+							<th class="px-4 py-3 text-left text-sm font-medium text-gray-600">评论</th>
+							<th class="px-4 py-3 text-left text-sm font-medium text-gray-600">创建时间</th>
+							<th class="px-4 py-3 text-left text-sm font-medium text-gray-600">操作</th>
+						</tr>
+					</thead>
+					<tbody id="posts-table-body">
+						if len(posts) == 0 {
+							<tr>
+								<td colspan="8" class="px-4 py-8 text-center text-gray-500">
+									暂无文章
+								</td>
+							</tr>
+						} else {
+							for _, p := range posts {
+								@PostTableRow(p)
+							}
+						}
+					</tbody>
+				</table>
+			</div>
+
+			<!-- 空状态 -->
+			<div id="empty-state" class="hidden text-center py-12">
+				<div class="text-gray-400 mb-4">
+					<svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+					</svg>
+				</div>
+				<h3 class="text-lg font-medium text-gray-900 mb-1">暂无文章</h3>
+				<p class="text-gray-500 mb-4">开始创建你的第一篇文章吧</p>
+				<a href="/admin/posts/new" class="inline-flex px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+					新建文章
+				</a>
+			</div>
+
+			<!-- 分页 -->
+			<div id="pagination" class="mt-6">
+				if total > pageSize {
+					@PostPagination(total, page, pageSize)
+				}
+			</div>
+		</div>
+		<script src="/static/dist/admin/posts.js"></script>
+	</body>
+</html>
+}
+
+// PostTableRow 文章表格行
+templ PostTableRow(p *post.Post) {
+	<tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+		<td class="px-4 py-3">
+			<input type="checkbox" class="post-checkbox rounded" data-id={ p.ID.String() }>
+		</td>
+		<td class="px-4 py-3">
+			<a href="/admin/posts/{ p.ID.String() }/edit" class="text-blue-600 hover:text-blue-800 font-medium">
+				{ p.Title }
+			</a>
+			if p.IsPaid {
+				<span class="ml-2 text-xs text-orange-600 bg-orange-100 px-1 rounded">付费</span>
+			}
+		</td>
+		<td class="px-4 py-3 text-sm text-gray-500">{ p.Slug }</td>
+		<td class="px-4 py-3">
+			@PostStatusLabel(p.Status)
+		</td>
+		<td class="px-4 py-3 text-sm text-gray-500">{ p.ViewCount }</td>
+		<td class="px-4 py-3 text-sm text-gray-500">{ p.CommentCount }</td>
+		<td class="px-4 py-3 text-sm text-gray-500">{ p.CreatedAt.Format("2006-01-02") }</td>
+		<td class="px-4 py-3">
+			<div class="flex gap-2">
+				if p.Status != post.StatusPublished {
+					<button class="publish-btn text-green-600 hover:text-green-800 text-sm" data-id={ p.ID.String() }>
+						发布
+					</button>
+				}
+				<a href="/posts/{ p.Slug }" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+					查看
+				</a>
+				<button class="delete-btn text-red-600 hover:text-red-800 text-sm" data-id={ p.ID.String() }>
+					删除
+				</button>
+			</div>
+		</td>
+	</tr>
+}
+
+// PostStatusLabel 状态标签
+templ PostStatusLabel(status post.PostStatus) {
+	switch status {
+		case post.StatusPublished:
+			<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">已发布</span>
+		case post.StatusDraft:
+			<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">草稿</span>
+		case post.StatusScheduled:
+			<span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">定时发布</span>
+		case post.StatusPrivate:
+			<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">私密</span>
+		default:
+			<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">{ string(status) }</span>
+	}
+}
+
+// PostPagination 分页组件
+templ PostPagination(total int, page int, pageSize int) {
+	<nav class="flex justify-center items-center gap-2">
+		<!-- 上一页 -->
+		if page > 1 {
+			<a href="/admin/posts?page={ page - 1 }" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+				上一页
+			</a>
+		} else {
+			<span class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-400 cursor-not-allowed">
+				上一页
+			</span>
+		}
+
+		<!-- 页码 -->
+		for i := 1; i <= calcTotalPages(total, pageSize); i++ {
+			if i == page {
+				<span class="px-4 py-2 bg-blue-600 text-white rounded-lg">
+					{ i }
+				</span>
+			} else {
+				<a href="/admin/posts?page={ i }" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+					{ i }
+				</a>
+			}
+		}
+
+		<!-- 下一页 -->
+		if page < calcTotalPages(total, pageSize) {
+			<a href="/admin/posts?page={ page + 1 }" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+				下一页
+			</a>
+		} else {
+			<span class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-400 cursor-not-allowed">
+				下一页
+			</span>
+		}
+	</nav>
+}

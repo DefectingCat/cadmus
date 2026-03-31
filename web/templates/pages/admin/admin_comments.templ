@@ -1,0 +1,243 @@
+package admin
+
+import (
+	"strconv"
+
+	"rua.plus/cadmus/internal/core/comment"
+)
+
+// intToString 整数转字符串
+func intToString(n int) string {
+	return strconv.Itoa(n)
+}
+
+// getStatusClass 获取状态样式类
+func getStatusClass(status string) string {
+	switch status {
+	case "pending":
+		return "bg-yellow-100 text-yellow-800"
+	case "approved":
+		return "bg-green-100 text-green-800"
+	case "spam":
+		return "bg-red-100 text-red-800"
+	case "deleted":
+		return "bg-gray-100 text-gray-800"
+	default:
+		return "bg-gray-100 text-gray-800"
+	}
+}
+
+// getStatusText 获取状态文本
+func getStatusText(status string) string {
+	switch status {
+	case "pending":
+		return "待审核"
+	case "approved":
+		return "已通过"
+	case "spam":
+		return "已拒绝"
+	case "deleted":
+		return "已删除"
+	default:
+		return status
+	}
+}
+
+// getTabClass 获取标签页样式类
+func getTabClass(currentStatus, tabStatus string) string {
+	if currentStatus == tabStatus {
+		switch tabStatus {
+		case "pending":
+			return "bg-yellow-100 text-yellow-800"
+		case "approved":
+			return "bg-green-100 text-green-800"
+		case "spam":
+			return "bg-red-100 text-red-800"
+		case "deleted":
+			return "bg-gray-100 text-gray-800"
+		}
+	}
+	return "text-gray-500 hover:text-gray-700"
+}
+
+// CommentStatusTab 评论状态标签页
+templ CommentStatusTab(status string) {
+	<span class={ "px-3 py-1 rounded-full text-sm font-medium", getStatusClass(status) }>
+		{ getStatusText(status) }
+	</span>
+}
+
+// CommentListItem 评论列表项
+templ CommentListItem(c *comment.Comment) {
+	<tr class="border-b border-gray-200 hover:bg-gray-50" data-comment-id={ c.ID.String() }>
+		<td class="p-4">
+			<input type="checkbox" class="comment-checkbox" value={ c.ID.String() }/>
+		</td>
+		<td class="p-4">
+			<div class="text-sm text-gray-900 max-w-md truncate">{ c.Content }</div>
+		</td>
+		<td class="p-4">
+			<span class="text-sm text-gray-500">{ c.PostID.String() }</span>
+		</td>
+		<td class="p-4">
+			<span class="text-sm text-gray-500">{ c.UserID.String() }</span>
+		</td>
+		<td class="p-4">
+			@CommentStatusTab(string(c.Status))
+		</td>
+		<td class="p-4">
+			<span class="text-sm text-gray-500">{ c.CreatedAt.Format("2006-01-02 15:04") }</span>
+		</td>
+		<td class="p-4">
+			<div class="flex space-x-2">
+				if c.Status == comment.StatusPending {
+					<button class="approve-btn px-2 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600" data-id={ c.ID.String() }>通过</button>
+					<button class="reject-btn px-2 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600" data-id={ c.ID.String() }>拒绝</button>
+				}
+				<button class="delete-btn px-2 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600" data-id={ c.ID.String() }>删除</button>
+			</div>
+		</td>
+	</tr>
+}
+
+// AdminCommentsPage 评论管理页面
+templ AdminCommentsPage(title string, status string, comments []*comment.Comment, page int, perPage int, total int) {
+	<!DOCTYPE html>
+	<html lang="zh-CN">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/static/dist/main.css"/>
+		</head>
+		<body class="min-h-screen bg-gray-100">
+			<!-- 顶部导航栏 -->
+			<header class="bg-white shadow-sm border-b border-gray-200">
+				<nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div class="flex justify-between h-16">
+						<div class="flex items-center">
+							<a href="/" class="text-xl font-bold text-gray-900">Cadmus Admin</a>
+						</div>
+						<div class="flex items-center space-x-4">
+							<a href="/admin/posts" class="text-gray-600 hover:text-gray-900">文章管理</a>
+							<a href="/admin/media" class="text-gray-600 hover:text-gray-900">媒体库</a>
+							<a href="/admin/comments" class="text-blue-600 font-medium">评论审核</a>
+							<a href="/admin/plugins" class="text-gray-600 hover:text-gray-900">插件</a>
+							<a href="/admin/themes" class="text-gray-600 hover:text-gray-900">主题</a>
+						</div>
+					</div>
+				</nav>
+			</header>
+
+			<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+				<div class="bg-white rounded-lg shadow-sm">
+					<!-- 页面标题 -->
+					<div class="p-6 border-b border-gray-200">
+						<h1 class="text-2xl font-bold text-gray-900">评论审核管理</h1>
+					</div>
+
+					<!-- 状态标签页 -->
+					<div class="border-b border-gray-200">
+						<nav class="flex space-x-4 p-4">
+							<a href="/admin/comments?status=pending" class={ "px-4 py-2 rounded-lg text-sm font-medium", getTabClass(status, "pending") }>
+								待审核
+							</a>
+							<a href="/admin/comments?status=approved" class={ "px-4 py-2 rounded-lg text-sm font-medium", getTabClass(status, "approved") }>
+								已通过
+							</a>
+							<a href="/admin/comments?status=spam" class={ "px-4 py-2 rounded-lg text-sm font-medium", getTabClass(status, "spam") }>
+								已拒绝
+							</a>
+							<a href="/admin/comments?status=deleted" class={ "px-4 py-2 rounded-lg text-sm font-medium", getTabClass(status, "deleted") }>
+								已删除
+							</a>
+						</nav>
+					</div>
+
+					<!-- 批量操作工具栏 -->
+					<div class="p-4 bg-gray-50 border-b border-gray-200" id="batch-toolbar">
+						<div class="flex items-center space-x-4">
+							<button id="select-all-btn" class="px-3 py-1 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded">
+								全选
+							</button>
+							<button id="batch-approve-btn" class="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 hidden">
+								批量通过
+							</button>
+							<button id="batch-reject-btn" class="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 hidden">
+								批量拒绝
+							</button>
+							<button id="batch-delete-btn" class="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 hidden">
+								批量删除
+							</button>
+							<span id="selected-count" class="text-sm text-gray-500 hidden">已选择 0 条</span>
+						</div>
+					</div>
+
+					<!-- 评论列表 -->
+					<div class="overflow-x-auto">
+						<table class="w-full">
+							<thead class="bg-gray-50">
+								<tr>
+									<th class="p-4 text-left text-sm font-medium text-gray-500 w-12">
+										<input type="checkbox" id="select-all-checkbox"/>
+									</th>
+									<th class="p-4 text-left text-sm font-medium text-gray-500">内容</th>
+									<th class="p-4 text-left text-sm font-medium text-gray-500">文章ID</th>
+									<th class="p-4 text-left text-sm font-medium text-gray-500">用户ID</th>
+									<th class="p-4 text-left text-sm font-medium text-gray-500">状态</th>
+									<th class="p-4 text-left text-sm font-medium text-gray-500">时间</th>
+									<th class="p-4 text-left text-sm font-medium text-gray-500">操作</th>
+								</tr>
+							</thead>
+							<tbody id="comments-list">
+								if len(comments) == 0 {
+									<tr>
+										<td colspan="7" class="p-8 text-center text-gray-500">
+											暂无评论
+										</td>
+									</tr>
+								} else {
+									for _, c := range comments {
+										@CommentListItem(c)
+									}
+								}
+							</tbody>
+						</table>
+					</div>
+
+					<!-- 分页 -->
+					if total > perPage {
+						<div class="p-4 border-t border-gray-200">
+							<div class="flex justify-between items-center">
+								<span class="text-sm text-gray-500">共 { total } 条</span>
+								<div class="flex space-x-2" id="pagination">
+									if page > 1 {
+										<a href={ templ.URL("/admin/comments?status=" + status + "&page=" + intToString(page - 1)) } class="px-3 py-1 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">上一页</a>
+									}
+									<span class="px-3 py-1 bg-blue-600 text-white rounded text-sm">{ page }</span>
+									if page * perPage < total {
+										<a href={ templ.URL("/admin/comments?status=" + status + "&page=" + intToString(page + 1)) } class="px-3 py-1 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">下一页</a>
+									}
+								</div>
+							</div>
+						</div>
+					}
+				</div>
+			</main>
+
+			<!-- 确认对话框 -->
+			<div id="confirm-dialog" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+				<div class="bg-white rounded-lg p-6 max-w-sm">
+					<h3 id="dialog-title" class="text-lg font-semibold mb-4">确认操作</h3>
+					<p id="dialog-message" class="text-gray-600 mb-6"></p>
+					<div class="flex justify-end space-x-3">
+						<button id="dialog-cancel" class="px-4 py-2 border border-gray-300 rounded text-gray-600 hover:bg-gray-50">取消</button>
+						<button id="dialog-confirm" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">确认</button>
+					</div>
+				</div>
+			</div>
+
+			<script src="/static/dist/admin/comments.js"></script>
+		</body>
+	</html>
+}

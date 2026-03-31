@@ -1,0 +1,149 @@
+package admin
+
+// ThemeInfo 主题信息
+type ThemeInfo struct {
+	ID          string
+	Name        string
+	Version     string
+	Author      string
+	Description string
+	Active      bool
+}
+
+// AdminThemesPage 主题管理页面（简化版）
+templ AdminThemesPage(title string, themes []ThemeInfo) {
+	<!DOCTYPE html>
+	<html lang="zh-CN">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/static/dist/main.css"/>
+		</head>
+		<body class="min-h-screen bg-gray-100">
+			<!-- 顶部导航栏 -->
+			<header class="bg-white shadow-sm border-b border-gray-200">
+				<nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div class="flex justify-between h-16">
+						<div class="flex items-center">
+							<a href="/" class="text-xl font-bold text-gray-900">Cadmus Admin</a>
+						</div>
+						<div class="flex items-center space-x-4">
+							<a href="/admin/posts" class="text-gray-600 hover:text-gray-900">文章管理</a>
+							<a href="/admin/media" class="text-gray-600 hover:text-gray-900">媒体库</a>
+							<a href="/admin/comments" class="text-gray-600 hover:text-gray-900">评论审核</a>
+							<a href="/admin/plugins" class="text-gray-600 hover:text-gray-900">插件</a>
+							<a href="/admin/themes" class="text-blue-600 font-medium">主题</a>
+						</div>
+					</div>
+				</nav>
+			</header>
+
+			<!-- 主内容区 -->
+			<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+				<div class="mb-6">
+					<h1 class="text-2xl font-bold text-gray-900">主题管理</h1>
+					<p class="text-gray-500 mt-1">切换和配置网站主题</p>
+				</div>
+
+				<!-- 主题卡片列表 -->
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+					for _, t := range themes {
+						@ThemeCard(t)
+					}
+				</div>
+
+				<!-- 提示信息 -->
+				<div class="mt-6 bg-blue-50 rounded-lg p-4">
+					<div class="flex items-start gap-3">
+						<svg class="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+						<div>
+							<p class="text-blue-700 font-medium">主题开发说明</p>
+							<p class="text-blue-600 text-sm mt-1">Cadmus 主题使用 templ 组件实现。如需开发自定义主题，请参考 themes/default 目录中的默认主题示例。</p>
+						</div>
+					</div>
+				</div>
+			</main>
+
+			<script>
+				// 主题切换逻辑
+				document.querySelectorAll('.theme-activate-btn').forEach(btn => {
+					btn.addEventListener('click', async () => {
+						const themeId = btn.dataset.themeId;
+						if (!themeId) return;
+
+						try {
+							const response = await fetch('/api/v1/admin/themes/active', {
+								method: 'PUT',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ theme_id: themeId })
+							});
+
+							if (response.ok) {
+								location.reload();
+							} else {
+								alert('切换主题失败');
+							}
+						} catch (e) {
+							alert('切换主题失败：' + e.message);
+						}
+					});
+				});
+			</script>
+		</body>
+	</html>
+}
+
+// ThemeCard 主题卡片组件
+templ ThemeCard(t ThemeInfo) {
+	<div class="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+		<!-- 主题预览图（占位） -->
+		<div class="h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+			<span class="text-4xl font-bold text-gray-400">{ t.Name }</span>
+		</div>
+
+		<!-- 主题信息 -->
+		<div class="p-4">
+			<div class="flex items-center justify-between mb-2">
+				<h3 class="text-sm font-medium text-gray-900">{ t.Name }</h3>
+				if t.Active {
+					<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+						当前主题
+					</span>
+				}
+			</div>
+			<p class="text-xs text-gray-500 mb-3">{ t.Description }</p>
+			<p class="text-xs text-gray-400 mb-3">版本 { t.Version } · { t.Author }</p>
+
+			<!-- 操作按钮 -->
+			<div class="flex gap-2">
+				if !t.Active {
+					<button
+						class="theme-activate-btn flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+						data-theme-id={ t.ID }
+					>
+						启用
+					</button>
+				} else {
+					<button
+						class="flex-1 px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors"
+						disabled
+					>
+						已启用
+					</button>
+				}
+				<button
+					class="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+					title="配置"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+					</svg>
+				</button>
+			</div>
+		</div>
+	</div>
+}

@@ -1,0 +1,340 @@
+package admin
+
+import (
+	"strconv"
+	"strings"
+
+	"rua.plus/cadmus/internal/core/post"
+)
+
+// getPageTitle 获取页面标题
+func getPageTitle(isNew bool) string {
+	if isNew {
+		return "新建文章"
+	}
+	return "编辑文章"
+}
+
+// joinKeywordsStr 连接关键词
+func joinKeywordsStr(keywords []string) string {
+	return strings.Join(keywords, ", ")
+}
+
+// formatPriceStr 格式化价格
+func formatPriceStr(price *float64) string {
+	if price == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*price, 'f', 2, 64)
+}
+
+// isSelected 判断是否选中
+func isSelected(currentID, optionID string) bool {
+	return currentID == optionID
+}
+
+// PostEditPage 文章编辑页面
+templ PostEditPage(p *post.Post, isNew bool, categories []*post.Category, tags []*post.Tag, series []*post.Series) {
+	<!DOCTYPE html>
+	<html lang="zh-CN">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ getPageTitle(isNew) }</title>
+			<link rel="stylesheet" href="/static/dist/main.css"/>
+		</head>
+		<body class="min-h-screen bg-gray-100">
+			<!-- 顶部导航栏 -->
+			<header class="bg-white shadow-sm border-b border-gray-200">
+				<nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div class="flex justify-between h-16">
+						<div class="flex items-center">
+							<a href="/" class="text-xl font-bold text-gray-900">Cadmus Admin</a>
+						</div>
+						<div class="flex items-center space-x-4">
+							<a href="/admin/posts" class="text-blue-600 font-medium">文章管理</a>
+							<a href="/admin/media" class="text-gray-600 hover:text-gray-900">媒体库</a>
+							<a href="/admin/comments" class="text-gray-600 hover:text-gray-900">评论审核</a>
+							<a href="/admin/plugins" class="text-gray-600 hover:text-gray-900">插件</a>
+							<a href="/admin/themes" class="text-gray-600 hover:text-gray-900">主题</a>
+						</div>
+					</div>
+				</nav>
+			</header>
+
+			<div class="px-6 py-4">
+				<!-- 页面标题 -->
+				<div class="flex justify-between items-center mb-6">
+					<h1 class="text-2xl font-bold text-gray-900">
+						if isNew {
+							新建文章
+						} else {
+							编辑文章
+						}
+					</h1>
+					<div class="flex gap-2">
+						<a href="/admin/posts" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+							返回列表
+						</a>
+					</div>
+				</div>
+
+				<!-- 自动保存状态 -->
+				<div id="autosave-indicator" class="text-sm text-gray-500 mb-4">
+					if !isNew {
+						上次保存: { p.UpdatedAt.Format("2006-01-02 15:04") }
+					}
+				</div>
+
+				<!-- 编辑表单 -->
+				<form id="post-form" class="space-y-6">
+					<!-- 基本信息区域 -->
+					<div class="bg-white rounded-lg shadow-sm p-6">
+						<h2 class="text-lg font-medium text-gray-900 mb-4">基本信息</h2>
+
+						<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+							<!-- 标题 -->
+							<div>
+								<label for="title-input" class="block text-sm font-medium text-gray-700 mb-1">标题</label>
+								<input type="text" id="title-input" name="title" value={ p.Title }
+									class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+									placeholder="请输入文章标题" required/>
+							</div>
+
+							<!-- Slug -->
+							<div>
+								<label for="slug-input" class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
+								<input type="text" id="slug-input" name="slug" value={ p.Slug }
+									class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+									placeholder="文章 URL 标识"/>
+							</div>
+
+							<!-- 分类 -->
+							<div>
+								<label for="category-select" class="block text-sm font-medium text-gray-700 mb-1">分类</label>
+								<select id="category-select" name="category_id"
+									class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+									<option value="">无分类</option>
+									for _, c := range categories {
+										if p.CategoryID == c.ID {
+											<option value={ c.ID.String() } selected>{ c.Name }</option>
+										} else {
+											<option value={ c.ID.String() }>{ c.Name }</option>
+										}
+									}
+								</select>
+							</div>
+
+							<!-- 状态 -->
+							<div>
+								<label for="status-select" class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+								<select id="status-select" name="status"
+									class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+									if p.Status == post.StatusDraft {
+										<option value="draft" selected>草稿</option>
+									} else {
+										<option value="draft">草稿</option>
+									}
+									if p.Status == post.StatusPublished {
+										<option value="published" selected>已发布</option>
+									} else {
+										<option value="published">已发布</option>
+									}
+									if p.Status == post.StatusScheduled {
+										<option value="scheduled" selected>定时发布</option>
+									} else {
+										<option value="scheduled">定时发布</option>
+									}
+									if p.Status == post.StatusPrivate {
+										<option value="private" selected>私密</option>
+									} else {
+										<option value="private">私密</option>
+									}
+								</select>
+							</div>
+						</div>
+
+						<!-- 摘要 -->
+						<div class="mt-6">
+							<label for="excerpt-input" class="block text-sm font-medium text-gray-700 mb-1">摘要</label>
+							<textarea id="excerpt-input" name="excerpt" rows="3"
+								class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+								placeholder="文章摘要（可选）">{ p.Excerpt }</textarea>
+						</div>
+
+						<!-- 特色图片 -->
+						<div class="mt-6">
+							<label for="featured-image-input" class="block text-sm font-medium text-gray-700 mb-1">特色图片</label>
+							<div class="flex gap-4">
+								<input type="text" id="featured-image-input" name="featured_image" value={ p.FeaturedImage }
+									class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+									placeholder="图片 URL"/>
+								<button type="button" id="select-image-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+									选择图片
+								</button>
+							</div>
+							if p.FeaturedImage != "" {
+								<div class="mt-2">
+									<img src={ p.FeaturedImage } alt="特色图片预览" class="w-32 h-20 object-cover rounded border"/>
+								</div>
+							}
+						</div>
+					</div>
+
+					<!-- 内容编辑区域 -->
+					<div class="bg-white rounded-lg shadow-sm p-6">
+						<h2 class="text-lg font-medium text-gray-900 mb-4">文章内容</h2>
+
+						<!-- 字数统计 -->
+						<div id="word-count" class="text-sm text-gray-500 mb-2">
+							0 字 · 预计阅读 0 分钟
+						</div>
+
+						<!-- 内容编辑器 -->
+						<div id="content-editor" class="min-h-[400px] border border-gray-300 rounded-lg">
+							<textarea id="content-textarea" name="content" class="w-full h-[400px] px-4 py-3 focus:outline-none font-mono"
+								placeholder="请输入文章内容...">{ string(p.Content) }</textarea>
+						</div>
+					</div>
+
+					<!-- 标签区域 -->
+					<div class="bg-white rounded-lg shadow-sm p-6">
+						<h2 class="text-lg font-medium text-gray-900 mb-4">标签</h2>
+						<div class="flex flex-wrap gap-2" id="tags-container">
+							for _, t := range p.Tags {
+								<span class="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+									{ t.Name }
+									<button type="button" class="ml-1 hover:text-blue-900" data-tag-id={ t.ID.String() }>&times;</button>
+								</span>
+							}
+						</div>
+						<div class="mt-4">
+							<input type="text" id="new-tag-input" placeholder="添加新标签..."
+								class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"/>
+						</div>
+					</div>
+
+					<!-- SEO 设置区域 -->
+					<div class="bg-white rounded-lg shadow-sm p-6">
+						<h2 class="text-lg font-medium text-gray-900 mb-4">SEO 设置</h2>
+
+						<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+							<!-- SEO 标题 -->
+							<div>
+								<label for="seo-title-input" class="block text-sm font-medium text-gray-700 mb-1">SEO 标题</label>
+								<input type="text" id="seo-title-input" name="seo_title" value={ p.SEOMeta.Title }
+									class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+									placeholder="SEO 标题（可选，默认使用文章标题）"/>
+							</div>
+
+							<!-- SEO 关键词 -->
+							<div>
+								<label for="seo-keywords-input" class="block text-sm font-medium text-gray-700 mb-1">SEO 关键词</label>
+								<input type="text" id="seo-keywords-input" name="seo_keywords"
+									value={ joinKeywordsStr(p.SEOMeta.Keywords) }
+									class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+									placeholder="关键词，用逗号分隔"/>
+							</div>
+						</div>
+
+						<!-- SEO 描述 -->
+						<div class="mt-6">
+							<label for="seo-description-input" class="block text-sm font-medium text-gray-700 mb-1">SEO 描述</label>
+							<textarea id="seo-description-input" name="seo_description" rows="2"
+								class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+								placeholder="SEO 描述（可选，默认使用文章摘要）">{ p.SEOMeta.Description }</textarea>
+						</div>
+					</div>
+
+					<!-- 付费设置区域 -->
+					<div class="bg-white rounded-lg shadow-sm p-6">
+						<h2 class="text-lg font-medium text-gray-900 mb-4">付费设置</h2>
+
+						<div class="flex items-center gap-4 mb-4">
+							<label class="flex items-center">
+								if p.IsPaid {
+									<input type="checkbox" id="is-paid-checkbox" name="is_paid" checked
+										class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+								} else {
+									<input type="checkbox" id="is-paid-checkbox" name="is_paid"
+										class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+								}
+								<span class="ml-2 text-sm text-gray-700">付费文章</span>
+							</label>
+						</div>
+
+						<div>
+							<label for="price-input" class="block text-sm font-medium text-gray-700 mb-1">价格</label>
+							<input type="number" id="price-input" name="price" value={ formatPriceStr(p.Price) }
+								class="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+								placeholder="0.00" step="0.01" min="0"/>
+						</div>
+					</div>
+
+					<!-- 系列设置（如果有的话） -->
+					if len(series) > 0 {
+						<div class="bg-white rounded-lg shadow-sm p-6">
+							<h2 class="text-lg font-medium text-gray-900 mb-4">文章系列</h2>
+
+							<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+								<div>
+									<label for="series-select" class="block text-sm font-medium text-gray-700 mb-1">所属系列</label>
+									<select id="series-select" name="series_id"
+										class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+										<option value="">不属于任何系列</option>
+										for _, s := range series {
+											if p.SeriesID != nil && *p.SeriesID == s.ID {
+												<option value={ s.ID.String() } selected>{ s.Title }</option>
+											} else {
+												<option value={ s.ID.String() }>{ s.Title }</option>
+											}
+										}
+									</select>
+								</div>
+								<div>
+									<label for="series-order-input" class="block text-sm font-medium text-gray-700 mb-1">系列内排序</label>
+									<input type="number" id="series-order-input" name="series_order" value={ strconv.Itoa(p.SeriesOrder) }
+										class="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+										placeholder="0" min="0"/>
+								</div>
+							</div>
+						</div>
+					}
+
+					<!-- 操作按钮 -->
+					<div class="flex justify-between items-center pt-6 border-t border-gray-200">
+						<div class="text-sm text-gray-500">
+							快捷键: Ctrl+S 保存
+						</div>
+						<div class="flex gap-2">
+							<button type="button" id="preview-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+								预览
+							</button>
+							<button type="button" id="save-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+								保存
+							</button>
+							if !isNew && p.Status != post.StatusPublished {
+								<button type="button" id="publish-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+									发布
+								</button>
+							}
+						</div>
+					</div>
+				</form>
+
+				<!-- 版本历史（仅编辑模式显示） -->
+				if !isNew && p.Version > 1 {
+					<div class="mt-8 bg-white rounded-lg shadow-sm p-6">
+						<h2 class="text-lg font-medium text-gray-900 mb-4">版本历史</h2>
+						<p class="text-sm text-gray-500">当前版本: { strconv.Itoa(p.Version) }</p>
+						<div id="versions-list" class="mt-4">
+							<!-- 版本历史通过 JS 加载 -->
+							<div class="text-center py-4 text-gray-400">加载中...</div>
+						</div>
+					</div>
+				}
+			</div>
+			<script src="/static/dist/admin/post-edit.js"></script>
+		</body>
+	</html>
+}
