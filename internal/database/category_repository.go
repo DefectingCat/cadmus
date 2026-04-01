@@ -1,3 +1,21 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含分类数据仓库的核心逻辑，包括：
+//   - 分类 CRUD 操作（创建、查询、更新、删除）
+//   - 多种查询方式（ID、Slug、父分类）
+//   - 层级分类管理（支持父子关系）
+//   - 分类排序管理
+//
+// 主要用途：
+//
+//	用于管理文章分类数据，支持层级分类结构。
+//
+// 注意事项：
+//   - 分类 Slug 有唯一约束
+//   - 删除分类前需检查是否有子分类或文章
+//   - 分类支持层级关系（parent_id）
+//
+// 作者：xfy
 package database
 
 import (
@@ -11,8 +29,12 @@ import (
 	"rua.plus/cadmus/internal/core/post"
 )
 
-// CategoryRepository 分类数据仓库实现
+// CategoryRepository 分类数据仓库实现。
+//
+// 负责分类数据的 CRUD 操作，支持层级分类管理和批量操作。
+// 所有操作通过连接池执行，确保高效的数据访问。
 type CategoryRepository struct {
+	// pool 数据库连接池
 	pool *Pool
 }
 

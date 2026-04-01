@@ -1,3 +1,21 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含评论数据仓库的核心逻辑，包括：
+//   - 评论 CRUD 操作（创建、查询、更新、删除）
+//   - 嵌套评论支持（最大深度 5 层）
+//   - 评论状态管理（待审核、已批准、已删除）
+//   - 评论点赞关联操作
+//
+// 主要用途：
+//
+//	用于管理文章评论数据，支持嵌套评论和点赞功能。
+//
+// 注意事项：
+//   - 评论删除采用软删除（标记为 deleted 状态）
+//   - 嵌套评论最大深度为 5 层
+//   - 点赞操作使用原子更新保证一致性
+//
+// 作者：xfy
 package database
 
 import (
@@ -12,8 +30,12 @@ import (
 	"rua.plus/cadmus/internal/core/comment"
 )
 
-// CommentRepository 评论数据仓库实现
+// CommentRepository 评论数据仓库实现。
+//
+// 负责评论数据的 CRUD 操作，支持嵌套评论和状态管理。
+// 所有操作通过连接池执行，确保高效的数据访问。
 type CommentRepository struct {
+	// pool 数据库连接池
 	pool *Pool
 }
 

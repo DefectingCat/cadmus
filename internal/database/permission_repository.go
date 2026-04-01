@@ -1,3 +1,20 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含权限数据仓库的核心逻辑，包括：
+//   - 权限查询（按角色、按类别）
+//   - 权限检查（验证角色是否拥有指定权限）
+//   - 权限列表获取
+//
+// 主要用途：
+//
+//	用于管理权限数据，支持 RBAC 权限模型的权限检查。
+//
+// 注意事项：
+//   - 权限数据通常由系统初始化时插入，不提供 CRUD 操作
+//   - 权限按类别分组便于管理
+//   - 权限检查使用 EXISTS 子查询提高效率
+//
+// 作者：xfy
 package database
 
 import (
@@ -8,8 +25,12 @@ import (
 	"rua.plus/cadmus/internal/core/user"
 )
 
-// PermissionRepository 权限数据仓库实现
+// PermissionRepository 权限数据仓库实现。
+//
+// 负责权限数据的查询和检查操作。
+// 权限数据为只读，由系统初始化时设置。
 type PermissionRepository struct {
+	// pool 数据库连接池
 	pool *Pool
 }
 

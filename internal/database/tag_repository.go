@@ -1,3 +1,21 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含标签数据仓库的核心逻辑，包括：
+//   - 标签 CRUD 操作（创建、查询、删除）
+//   - 多种查询方式（ID、Slug、名称）
+//   - 文章-标签关联管理
+//   - 标签使用统计
+//
+// 主要用途：
+//
+//	用于管理标签数据及其与文章的关联关系。
+//
+// 注意事项：
+//   - 标签名称和 Slug 有唯一约束
+//   - 删除标签会级联删除文章-标签关联
+//   - 标签不支持更新，只能创建和删除
+//
+// 作者：xfy
 package database
 
 import (
@@ -11,8 +29,12 @@ import (
 	"rua.plus/cadmus/internal/core/post"
 )
 
-// TagRepository 标签数据仓库实现
+// TagRepository 标签数据仓库实现。
+//
+// 负责标签数据的 CRUD 操作和文章-标签关联管理。
+// 所有操作通过连接池执行，确保高效的数据访问。
 type TagRepository struct {
+	// pool 数据库连接池
 	pool *Pool
 }
 

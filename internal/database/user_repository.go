@@ -1,3 +1,21 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含用户数据仓库的核心逻辑，包括：
+//   - 用户 CRUD 操作（创建、查询、更新、删除）
+//   - 多种查询方式（ID、邮箱、用户名）
+//   - 用户列表分页查询
+//   - 唯一约束冲突检测
+//
+// 主要用途：
+//
+//	用于管理用户数据的持久化存储，提供服务层与数据库之间的数据访问层。
+//
+// 注意事项：
+//   - 用户删除采用软删除（设置 banned 状态）
+//   - 用户名和邮箱有唯一约束
+//   - 所有方法都需要传入有效的上下文
+//
+// 作者：xfy
 package database
 
 import (
@@ -12,8 +30,12 @@ import (
 	"rua.plus/cadmus/internal/core/user"
 )
 
-// UserRepository 用户数据仓库实现
+// UserRepository 用户数据仓库实现。
+//
+// 负责用户数据的 CRUD 操作，支持多种查询方式和分页查询。
+// 所有操作通过连接池执行，确保高效的数据访问。
 type UserRepository struct {
+	// pool 数据库连接池
 	pool *Pool
 }
 

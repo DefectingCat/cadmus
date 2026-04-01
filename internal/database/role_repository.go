@@ -1,3 +1,21 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含角色数据仓库的核心逻辑，包括：
+//   - 角色 CRUD 操作（创建、查询、更新、删除）
+//   - 多种查询方式（ID、名称、默认角色）
+//   - 角色权限关联管理
+//   - 事务支持（使用事务管理器）
+//
+// 主要用途：
+//
+//	用于管理用户角色数据，支持 RBAC 权限模型。
+//
+// 注意事项：
+//   - 删除角色会同时删除角色-权限关联
+//   - 角色名称有唯一约束
+//   - 设置权限支持事务模式
+//
+// 作者：xfy
 package database
 
 import (
@@ -10,10 +28,16 @@ import (
 	"rua.plus/cadmus/internal/core/user"
 )
 
-// RoleRepository 角色数据仓库实现
+// RoleRepository 角色数据仓库实现。
+//
+// 负责角色数据的 CRUD 操作和权限关联管理。
+// 支持事务管理器进行原子性权限设置操作。
 type RoleRepository struct {
-	pool          *Pool
-	txManager     *TransactionManager
+	// pool 数据库连接池
+	pool *Pool
+
+	// txManager 可选的事务管理器，用于复杂事务操作
+	txManager *TransactionManager
 }
 
 // NewRoleRepository 创建角色仓库

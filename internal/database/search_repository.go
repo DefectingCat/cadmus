@@ -1,3 +1,21 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含搜索数据仓库的核心逻辑，包括：
+//   - 全文搜索文章（基于 PostgreSQL tsvector）
+//   - 多条件筛选（作者、分类、标签）
+//   - 搜索建议（自动补全）
+//   - 搜索结果排序（按相关性 rank）
+//
+// 主要用途：
+//
+//	用于实现文章全文搜索功能，支持中文分词和多种筛选条件。
+//
+// 注意事项：
+//   - 使用 PostgreSQL 的 websearch_to_tsquery 进行搜索
+//   - 默认只搜索已发布的文章
+//   - 搜索建议基于文章标题提取关键词
+//
+// 作者：xfy
 package database
 
 import (
@@ -8,8 +26,12 @@ import (
 	"rua.plus/cadmus/internal/core/search"
 )
 
-// SearchRepository 搜索仓库实现
+// SearchRepository 搜索数据仓库实现。
+//
+// 负责全文搜索功能，基于 PostgreSQL 的 tsvector 实现。
+// 支持多条件筛选和搜索建议。
 type SearchRepository struct {
+	// pool 数据库连接池
 	pool *Pool
 }
 

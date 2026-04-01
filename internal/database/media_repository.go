@@ -1,3 +1,21 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含媒体数据仓库的核心逻辑，包括：
+//   - 媒体文件 CRUD 操作（创建、查询、删除）
+//   - 按上传者查询媒体列表
+//   - 媒体列表分页和筛选
+//   - 媒体统计计数
+//
+// 主要用途：
+//
+//	用于管理用户上传的媒体文件元数据，支持图片、视频等多种类型。
+//
+// 注意事项：
+//   - 媒体删除为硬删除，需确保文件已从存储中删除
+//   - 支持按 MIME 类型筛选（如 image/%）
+//   - 图片宽高信息可选（非图片类型为 nil）
+//
+// 作者：xfy
 package database
 
 import (
@@ -11,8 +29,12 @@ import (
 	"rua.plus/cadmus/internal/core/media"
 )
 
-// MediaRepository 媒体数据仓库实现
+// MediaRepository 媒体数据仓库实现。
+//
+// 负责媒体文件元数据的 CRUD 操作，支持按上传者和类型筛选。
+// 所有操作通过连接池执行，确保高效的数据访问。
 type MediaRepository struct {
+	// pool 数据库连接池
 	pool *Pool
 }
 

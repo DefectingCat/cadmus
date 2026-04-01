@@ -1,3 +1,22 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含文章数据仓库的核心逻辑，包括：
+//   - 文章 CRUD 操作（创建、查询、更新、删除）
+//   - 多种查询方式（ID、Slug、作者、分类、系列）
+//   - 文章列表分页和筛选
+//   - 文章版本历史管理
+//   - 文章点赞关联操作
+//
+// 主要用途：
+//
+//	用于管理文章数据的持久化存储，支持完整的文章生命周期管理。
+//
+// 注意事项：
+//   - 文章 Slug 有唯一约束
+//   - 文章版本支持乐观锁机制
+//   - 删除操作为硬删除，需谨慎使用
+//
+// 作者：xfy
 package database
 
 import (
@@ -12,8 +31,12 @@ import (
 	"rua.plus/cadmus/internal/core/post"
 )
 
-// PostRepository 文章数据仓库实现
+// PostRepository 文章数据仓库实现。
+//
+// 负责文章数据的 CRUD 操作，支持多种查询方式、分页筛选和版本管理。
+// 所有操作通过连接池执行，确保高效的数据访问。
 type PostRepository struct {
+	// pool 数据库连接池
 	pool *Pool
 }
 

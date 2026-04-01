@@ -1,3 +1,20 @@
+// Package database 提供了 Cadmus 数据库访问层的实现。
+//
+// 该文件包含系列数据仓库的核心逻辑，包括：
+//   - 系列 CRUD 操作（创建、查询、更新、删除）
+//   - 多种查询方式（ID、Slug、作者）
+//   - 系列文章统计
+//
+// 主要用途：
+//
+//	用于管理文章系列数据，支持将相关文章组织成系列。
+//
+// 注意事项：
+//   - 系列 Slug 有唯一约束
+//   - 删除系列时文章的 series_id 会被置空（ON DELETE SET NULL）
+//   - 系列支持封面图片和描述信息
+//
+// 作者：xfy
 package database
 
 import (
@@ -11,8 +28,12 @@ import (
 	"rua.plus/cadmus/internal/core/post"
 )
 
-// SeriesRepository 系列数据仓库实现
+// SeriesRepository 系列数据仓库实现。
+//
+// 负责系列数据的 CRUD 操作，支持按作者查询和文章统计。
+// 所有操作通过连接池执行，确保高效的数据访问。
 type SeriesRepository struct {
+	// pool 数据库连接池
 	pool *Pool
 }
 
