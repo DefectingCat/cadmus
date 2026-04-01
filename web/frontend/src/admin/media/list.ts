@@ -52,7 +52,7 @@ export class MediaList {
   private init(): void {
     // 搜索防抖
     let searchTimeout: number | null = null;
-    this.searchInput.addEventListener('input', () => {
+    this.searchInput.addEventListener("input", () => {
       if (searchTimeout) clearTimeout(searchTimeout);
       searchTimeout = window.setTimeout(() => {
         this.currentPage = 1;
@@ -61,20 +61,20 @@ export class MediaList {
     });
 
     // 类型筛选
-    this.typeFilter.addEventListener('change', () => {
+    this.typeFilter.addEventListener("change", () => {
       this.currentPage = 1;
       this.loadMedia();
     });
 
     // 分页按钮
-    document.getElementById('prev-page')?.addEventListener('click', () => {
+    document.getElementById("prev-page")?.addEventListener("click", () => {
       if (this.currentPage > 1) {
         this.currentPage--;
         this.loadMedia();
       }
     });
 
-    document.getElementById('next-page')?.addEventListener('click', () => {
+    document.getElementById("next-page")?.addEventListener("click", () => {
       if (this.currentPage * this.perPage < this.total) {
         this.currentPage++;
         this.loadMedia();
@@ -82,21 +82,21 @@ export class MediaList {
     });
 
     // 清除选择
-    document.getElementById('clear-selection-btn')?.addEventListener('click', () => {
+    document.getElementById("clear-selection-btn")?.addEventListener("click", () => {
       this.clearSelection();
     });
 
     // 全局点击处理（媒体项点击和复选框）
-    this.grid.addEventListener('click', (e) => {
+    this.grid.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
-      const mediaItem = target.closest('.media-item') as HTMLElement;
+      const mediaItem = target.closest(".media-item") as HTMLElement;
 
       if (!mediaItem) return;
 
       const mediaId = mediaItem.dataset.id;
 
       // 如果点击的是复选框
-      if (target.classList.contains('media-checkbox')) {
+      if (target.classList.contains("media-checkbox")) {
         const checkbox = target as HTMLInputElement;
         if (checkbox.checked) {
           this.selectedItems.add(mediaId);
@@ -114,7 +114,7 @@ export class MediaList {
     });
 
     // 删除选中按钮
-    document.getElementById('delete-selected-btn')?.addEventListener('click', () => {
+    document.getElementById("delete-selected-btn")?.addEventListener("click", () => {
       this.deleteSelected();
     });
 
@@ -133,26 +133,26 @@ export class MediaList {
     const params = new URLSearchParams();
     const offset = (this.currentPage - 1) * this.perPage;
 
-    params.set('offset', String(offset));
-    params.set('limit', String(this.perPage));
+    params.set("offset", String(offset));
+    params.set("limit", String(this.perPage));
 
     const search = this.searchInput.value.trim();
     if (search) {
-      params.set('search', search);
+      params.set("search", search);
     }
 
     const type = this.typeFilter.value;
     if (type) {
-      params.set('type', type);
+      params.set("type", type);
     }
 
     try {
       const response = await fetch(`/api/v1/media?${params}`, {
-        headers: this.getAuthHeaders()
+        headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
-        throw new Error('加载失败');
+        throw new Error("加载失败");
       }
 
       const data: MediaListResponse = await response.json();
@@ -160,7 +160,7 @@ export class MediaList {
       this.renderMediaList(data.media);
       this.updatePagination();
     } catch (error) {
-      console.error('加载媒体列表失败:', error);
+      console.error("加载媒体列表失败:", error);
     }
   }
 
@@ -181,21 +181,21 @@ export class MediaList {
       return;
     }
 
-    this.grid.innerHTML = medias.map(m => this.renderMediaItem(m)).join('');
+    this.grid.innerHTML = medias.map((m) => this.renderMediaItem(m)).join("");
   }
 
   /**
    * 渲染单个媒体项
    */
   private renderMediaItem(m: MediaItem): string {
-    const isImage = m.mime_type.startsWith('image/');
+    const isImage = m.mime_type.startsWith("image/");
     const sizeStr = this.formatFileSize(m.size);
     const isSelected = this.selectedItems.has(m.id);
 
     if (isImage) {
       return `
         <div
-          class="media-item relative group bg-gray-50 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all ${isSelected ? 'ring-2 ring-blue-500' : ''}"
+          class="media-item relative group bg-gray-50 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all ${isSelected ? "ring-2 ring-blue-500" : ""}"
           data-id="${m.id}"
           data-mime="${m.mime_type}"
           data-url="${m.url}"
@@ -206,7 +206,7 @@ export class MediaList {
               type="checkbox"
               class="media-checkbox w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               data-id="${m.id}"
-              ${isSelected ? 'checked' : ''}
+              ${isSelected ? "checked" : ""}
             />
           </div>
           <div class="aspect-square flex items-center justify-center">
@@ -221,7 +221,7 @@ export class MediaList {
     } else {
       return `
         <div
-          class="media-item relative group bg-gray-50 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all ${isSelected ? 'ring-2 ring-blue-500' : ''}"
+          class="media-item relative group bg-gray-50 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all ${isSelected ? "ring-2 ring-blue-500" : ""}"
           data-id="${m.id}"
           data-mime="${m.mime_type}"
           data-url="${m.url}"
@@ -232,7 +232,7 @@ export class MediaList {
               type="checkbox"
               class="media-checkbox w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               data-id="${m.id}"
-              ${isSelected ? 'checked' : ''}
+              ${isSelected ? "checked" : ""}
             />
           </div>
           <div class="aspect-square flex items-center justify-center">
@@ -256,8 +256,8 @@ export class MediaList {
    * 更新分页状态
    */
   private updatePagination(): void {
-    const prevBtn = document.getElementById('prev-page') as HTMLButtonElement;
-    const nextBtn = document.getElementById('next-page') as HTMLButtonElement;
+    const prevBtn = document.getElementById("prev-page") as HTMLButtonElement;
+    const nextBtn = document.getElementById("next-page") as HTMLButtonElement;
 
     if (prevBtn) {
       prevBtn.disabled = this.currentPage <= 1;
@@ -272,9 +272,9 @@ export class MediaList {
    * 更新选择 UI
    */
   private updateSelectionUI(): void {
-    const countEl = document.getElementById('selected-count');
-    const clearBtn = document.getElementById('clear-selection-btn');
-    const deleteBtn = document.getElementById('delete-selected-btn');
+    const countEl = document.getElementById("selected-count");
+    const clearBtn = document.getElementById("clear-selection-btn");
+    const deleteBtn = document.getElementById("delete-selected-btn");
 
     const count = this.selectedItems.size;
 
@@ -283,7 +283,7 @@ export class MediaList {
     }
 
     if (clearBtn) {
-      clearBtn.classList.toggle('hidden', count === 0);
+      clearBtn.classList.toggle("hidden", count === 0);
     }
 
     if (deleteBtn) {
@@ -296,11 +296,11 @@ export class MediaList {
    */
   private clearSelection(): void {
     this.selectedItems.clear();
-    this.grid.querySelectorAll('.media-checkbox').forEach(cb => {
+    this.grid.querySelectorAll(".media-checkbox").forEach((cb) => {
       (cb as HTMLInputElement).checked = false;
     });
-    this.grid.querySelectorAll('.media-item').forEach(item => {
-      item.classList.remove('ring-2', 'ring-blue-500');
+    this.grid.querySelectorAll(".media-item").forEach((item) => {
+      item.classList.remove("ring-2", "ring-blue-500");
     });
     this.updateSelectionUI();
   }
@@ -312,19 +312,19 @@ export class MediaList {
     const mediaItem = this.grid.querySelector(`[data-id="${mediaId}"]`) as HTMLElement;
     if (!mediaItem) return;
 
-    const modal = document.getElementById('media-modal');
-    const modalContent = document.getElementById('modal-content');
-    const modalTitle = document.getElementById('modal-title');
+    const modal = document.getElementById("media-modal");
+    const modalContent = document.getElementById("modal-content");
+    const modalTitle = document.getElementById("modal-title");
 
     if (!modal || !modalContent) return;
 
     const url = mediaItem.dataset.url;
     const name = mediaItem.dataset.name;
     const mime = mediaItem.dataset.mime;
-    const isImage = mime?.startsWith('image/');
+    const isImage = mime?.startsWith("image/");
 
     if (modalTitle) {
-      modalTitle.textContent = name || '媒体详情';
+      modalTitle.textContent = name || "媒体详情";
     }
 
     if (isImage && url) {
@@ -352,27 +352,27 @@ export class MediaList {
       `;
     }
 
-    modal.classList.remove('hidden');
+    modal.classList.remove("hidden");
     modal.dataset.mediaId = mediaId;
-    modal.dataset.url = url || '';
-    modal.dataset.name = name || '';
+    modal.dataset.url = url || "";
+    modal.dataset.name = name || "";
 
     // 关闭按钮
-    document.getElementById('close-modal')?.addEventListener('click', () => {
-      modal.classList.add('hidden');
+    document.getElementById("close-modal")?.addEventListener("click", () => {
+      modal.classList.add("hidden");
     });
 
     // 插入到文章
-    document.getElementById('insert-media-btn')?.addEventListener('click', () => {
-      this.insertMedia(mediaId, url || '', name || '', isImage);
-      modal.classList.add('hidden');
+    document.getElementById("insert-media-btn")?.addEventListener("click", () => {
+      this.insertMedia(mediaId, url || "", name || "", isImage);
+      modal.classList.add("hidden");
     });
 
     // 删除媒体
-    document.getElementById('delete-media-btn')?.addEventListener('click', async () => {
-      if (confirm('确定要删除这个媒体文件吗？')) {
+    document.getElementById("delete-media-btn")?.addEventListener("click", async () => {
+      if (confirm("确定要删除这个媒体文件吗？")) {
         await this.deleteMedia(mediaId);
-        modal.classList.add('hidden');
+        modal.classList.add("hidden");
       }
     });
   }
@@ -386,17 +386,17 @@ export class MediaList {
         id,
         url,
         original_name: name,
-        mime_type: isImage ? 'image/jpeg' : 'application/octet-stream',
-        uploader_id: '',
-        filename: '',
+        mime_type: isImage ? "image/jpeg" : "application/octet-stream",
+        uploader_id: "",
+        filename: "",
         size: 0,
-        created_at: ''
+        created_at: "",
       });
     } else {
       // 默认行为：复制 Markdown 格式到剪贴板
       const text = isImage ? `![${name}](${url})` : `[${name}](${url})`;
       navigator.clipboard.writeText(text).then(() => {
-        alert('已复制到剪贴板：' + text);
+        alert("已复制到剪贴板：" + text);
       });
     }
   }
@@ -407,12 +407,12 @@ export class MediaList {
   private async deleteMedia(mediaId: string): Promise<void> {
     try {
       const response = await fetch(`/api/v1/media/${mediaId}`, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders()
+        method: "DELETE",
+        headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
-        throw new Error('删除失败');
+        throw new Error("删除失败");
       }
 
       // 从列表中移除
@@ -422,13 +422,13 @@ export class MediaList {
       }
 
       // 检查是否需要重新加载
-      if (this.grid.querySelectorAll('.media-item').length === 0 && this.currentPage > 1) {
+      if (this.grid.querySelectorAll(".media-item").length === 0 && this.currentPage > 1) {
         this.currentPage--;
         this.loadMedia();
       }
     } catch (error) {
-      console.error('删除媒体失败:', error);
-      alert('删除失败');
+      console.error("删除媒体失败:", error);
+      alert("删除失败");
     }
   }
 
@@ -447,8 +447,8 @@ export class MediaList {
     for (const id of ids) {
       try {
         const response = await fetch(`/api/v1/media/${id}`, {
-          method: 'DELETE',
-          headers: this.getAuthHeaders()
+          method: "DELETE",
+          headers: this.getAuthHeaders(),
         });
 
         if (response.ok) {
@@ -469,7 +469,7 @@ export class MediaList {
     }
 
     // 检查是否需要重新加载
-    if (this.grid.querySelectorAll('.media-item').length === 0) {
+    if (this.grid.querySelectorAll(".media-item").length === 0) {
       if (this.currentPage > 1) {
         this.currentPage--;
       }
@@ -482,11 +482,11 @@ export class MediaList {
    */
   private formatFileSize(size: number): string {
     if (size < 1024) {
-      return size + ' B';
+      return size + " B";
     } else if (size < 1024 * 1024) {
-      return (size / 1024).toFixed(1) + ' KB';
+      return (size / 1024).toFixed(1) + " KB";
     } else {
-      return (size / 1024 / 1024).toFixed(1) + ' MB';
+      return (size / 1024 / 1024).toFixed(1) + " MB";
     }
   }
 
@@ -494,12 +494,12 @@ export class MediaList {
    * 获取认证请求头
    */
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = {
-      'Content-Type': 'application/json'
+      "Content-Type": "application/json",
     };
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
     return headers;
   }
@@ -512,11 +512,11 @@ export class MediaList {
     const newItem = this.renderMediaItem(media);
 
     // 插入到开头
-    if (currentHtml.includes('col-span-full')) {
+    if (currentHtml.includes("col-span-full")) {
       // 当前是空状态
       this.grid.innerHTML = newItem;
     } else {
-      this.grid.insertAdjacentHTML('afterbegin', newItem);
+      this.grid.insertAdjacentHTML("afterbegin", newItem);
     }
   }
 }
@@ -532,8 +532,9 @@ export class MediaPicker {
 
   public open(): void {
     // 创建模态框
-    this.modal = document.createElement('div');
-    this.modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
+    this.modal = document.createElement("div");
+    this.modal.className =
+      "fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center";
     this.modal.innerHTML = `
       <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
         <div class="p-4 border-b border-gray-200 flex justify-between items-center">
@@ -558,12 +559,12 @@ export class MediaPicker {
     this.loadMedia();
 
     // 关闭按钮
-    this.modal.querySelector('.close-picker')?.addEventListener('click', () => {
+    this.modal.querySelector(".close-picker")?.addEventListener("click", () => {
       this.close();
     });
 
     // 点击背景关闭
-    this.modal.addEventListener('click', (e) => {
+    this.modal.addEventListener("click", (e) => {
       if (e.target === this.modal) {
         this.close();
       }
@@ -580,23 +581,26 @@ export class MediaPicker {
   private async loadMedia(): Promise<void> {
     if (!this.modal) return;
 
-    const grid = this.modal.querySelector('.picker-grid') as HTMLElement;
+    const grid = this.modal.querySelector(".picker-grid") as HTMLElement;
     if (!grid) return;
 
     try {
-      const response = await fetch('/api/v1/media?limit=40', {
-        headers: this.getAuthHeaders()
+      const response = await fetch("/api/v1/media?limit=40", {
+        headers: this.getAuthHeaders(),
       });
 
-      if (!response.ok) throw new Error('加载失败');
+      if (!response.ok) throw new Error("加载失败");
 
       const data: MediaListResponse = await response.json();
 
-      grid.innerHTML = data.media.map(m => `
+      grid.innerHTML = data.media
+        .map(
+          (m) => `
         <div class="picker-item cursor-pointer rounded-lg overflow-hidden hover:ring-2 hover:ring-blue-500" data-id="${m.id}" data-url="${m.url}" data-name="${m.original_name}" data-mime="${m.mime_type}">
-          ${m.mime_type.startsWith('image/')
-            ? `<img src="${m.url}" alt="${m.original_name}" class="w-full aspect-square object-cover"/>`
-            : `<div class="w-full aspect-square bg-gray-100 flex items-center justify-center text-gray-400">
+          ${
+            m.mime_type.startsWith("image/")
+              ? `<img src="${m.url}" alt="${m.original_name}" class="w-full aspect-square object-cover"/>`
+              : `<div class="w-full aspect-square bg-gray-100 flex items-center justify-center text-gray-400">
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
@@ -604,20 +608,22 @@ export class MediaPicker {
           }
           <p class="text-xs text-gray-600 truncate p-1">${m.original_name}</p>
         </div>
-      `).join('');
+      `
+        )
+        .join("");
 
       // 点击选择
-      grid.querySelectorAll('.picker-item').forEach(item => {
-        item.addEventListener('click', () => {
+      grid.querySelectorAll(".picker-item").forEach((item) => {
+        item.addEventListener("click", () => {
           const media: MediaItem = {
-            id: item.dataset.id || '',
-            url: item.dataset.url || '',
-            original_name: item.dataset.name || '',
-            mime_type: item.dataset.mime || '',
-            uploader_id: '',
-            filename: '',
+            id: item.dataset.id || "",
+            url: item.dataset.url || "",
+            original_name: item.dataset.name || "",
+            mime_type: item.dataset.mime || "",
+            uploader_id: "",
+            filename: "",
             size: 0,
-            created_at: ''
+            created_at: "",
           };
 
           if (this.onSelect) {
@@ -632,10 +638,10 @@ export class MediaPicker {
   }
 
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = {};
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
     return headers;
   }
@@ -652,6 +658,8 @@ export function createMediaList(options: {
   return new MediaList(options);
 }
 
-export function createMediaPicker(options?: { onSelect?: (media: MediaItem) => void }): MediaPicker {
+export function createMediaPicker(options?: {
+  onSelect?: (media: MediaItem) => void;
+}): MediaPicker {
   return new MediaPicker(options);
 }

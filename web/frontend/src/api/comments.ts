@@ -1,6 +1,6 @@
 // 评论管理 API
 
-const API_BASE = '/api/v1';
+const API_BASE = "/api/v1";
 
 interface Comment {
   id: string;
@@ -30,17 +30,17 @@ interface ApiError {
 
 // 获取存储的 token
 function getAuthToken(): string | null {
-  return localStorage.getItem('auth_token');
+  return localStorage.getItem("auth_token");
 }
 
 // 创建带认证的请求头
 function createHeaders(): HeadersInit {
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   };
   const token = getAuthToken();
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers["Authorization"] = `Bearer ${token}`;
   }
   return headers;
 }
@@ -52,7 +52,7 @@ async function handleApiError(response: Response): Promise<ApiError> {
     return data as ApiError;
   } catch {
     return {
-      code: 'UNKNOWN_ERROR',
+      code: "UNKNOWN_ERROR",
       message: `请求失败: ${response.status} ${response.statusText}`,
     };
   }
@@ -66,7 +66,7 @@ export async function getAdminComments(
 ): Promise<AdminCommentListResponse> {
   const url = `${API_BASE}/admin/comments?status=${status}&page=${page}&per_page=${perPage}`;
   const response = await fetch(url, {
-    method: 'GET',
+    method: "GET",
     headers: createHeaders(),
   });
 
@@ -82,7 +82,7 @@ export async function getAdminComments(
 export async function approveComment(id: string): Promise<void> {
   const url = `${API_BASE}/comments/${id}/approve`;
   const response = await fetch(url, {
-    method: 'PUT',
+    method: "PUT",
     headers: createHeaders(),
   });
 
@@ -96,7 +96,7 @@ export async function approveComment(id: string): Promise<void> {
 export async function rejectComment(id: string): Promise<void> {
   const url = `${API_BASE}/comments/${id}/reject`;
   const response = await fetch(url, {
-    method: 'PUT',
+    method: "PUT",
     headers: createHeaders(),
   });
 
@@ -110,7 +110,7 @@ export async function rejectComment(id: string): Promise<void> {
 export async function deleteComment(id: string): Promise<void> {
   const url = `${API_BASE}/admin/comments/${id}`;
   const response = await fetch(url, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: createHeaders(),
   });
 
@@ -124,7 +124,7 @@ export async function deleteComment(id: string): Promise<void> {
 export async function batchApproveComments(ids: string[]): Promise<void> {
   const url = `${API_BASE}/admin/comments/batch-approve`;
   const response = await fetch(url, {
-    method: 'PUT',
+    method: "PUT",
     headers: createHeaders(),
     body: JSON.stringify({ ids }),
   });
@@ -139,7 +139,7 @@ export async function batchApproveComments(ids: string[]): Promise<void> {
 export async function batchRejectComments(ids: string[]): Promise<void> {
   const url = `${API_BASE}/admin/comments/batch-reject`;
   const response = await fetch(url, {
-    method: 'PUT',
+    method: "PUT",
     headers: createHeaders(),
     body: JSON.stringify({ ids }),
   });
@@ -154,7 +154,7 @@ export async function batchRejectComments(ids: string[]): Promise<void> {
 export async function batchDeleteComments(ids: string[]): Promise<void> {
   const url = `${API_BASE}/admin/comments/batch-delete`;
   const response = await fetch(url, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: createHeaders(),
     body: JSON.stringify({ ids }),
   });
