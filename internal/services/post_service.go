@@ -341,6 +341,7 @@ type CategoryService interface {
 	GetBySlug(ctx context.Context, slug string) (*post.Category, error)
 	GetAll(ctx context.Context) ([]*post.Category, error)
 	GetChildren(ctx context.Context, parentID uuid.UUID) ([]*post.Category, error)
+	GetPostCount(ctx context.Context, categoryID uuid.UUID) (int, error)
 }
 
 type categoryServiceImpl struct {
@@ -379,6 +380,10 @@ func (s *categoryServiceImpl) GetChildren(ctx context.Context, parentID uuid.UUI
 	return s.repo.GetChildren(ctx, parentID)
 }
 
+func (s *categoryServiceImpl) GetPostCount(ctx context.Context, categoryID uuid.UUID) (int, error) {
+	return s.repo.GetPostCount(ctx, categoryID)
+}
+
 // TagService 标签服务接口
 type TagService interface {
 	Create(ctx context.Context, t *post.Tag) error
@@ -387,6 +392,7 @@ type TagService interface {
 	GetBySlug(ctx context.Context, slug string) (*post.Tag, error)
 	GetByName(ctx context.Context, name string) (*post.Tag, error)
 	GetAll(ctx context.Context) ([]*post.Tag, error)
+	GetPostCount(ctx context.Context, tagID uuid.UUID) (int, error)
 }
 
 type tagServiceImpl struct {
@@ -419,6 +425,10 @@ func (s *tagServiceImpl) GetByName(ctx context.Context, name string) (*post.Tag,
 
 func (s *tagServiceImpl) GetAll(ctx context.Context) ([]*post.Tag, error) {
 	return s.repo.GetAll(ctx)
+}
+
+func (s *tagServiceImpl) GetPostCount(ctx context.Context, tagID uuid.UUID) (int, error) {
+	return s.repo.GetPostCount(ctx, tagID)
 }
 
 // SeriesService 系列服务接口

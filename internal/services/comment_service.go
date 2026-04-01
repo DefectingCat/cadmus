@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"rua.plus/cadmus/internal/core/comment"
+	"rua.plus/cadmus/internal/database"
 )
 
 // MaxCommentDepth 评论最大嵌套深度
@@ -45,6 +46,9 @@ type CommentService interface {
 
 	// IsLiked 检查用户是否已点赞
 	IsLiked(ctx context.Context, commentID, userID uuid.UUID) (bool, error)
+
+	// GetLikesBatch 批量检查用户对多个评论的点赞状态
+	GetLikesBatch(ctx context.Context, commentIDs []uuid.UUID, userID uuid.UUID) (map[uuid.UUID]bool, error)
 
 	// CountCommentsByPost 统计文章评论数量
 	CountCommentsByPost(ctx context.Context, postID uuid.UUID) (int, error)
@@ -275,6 +279,21 @@ func (s *commentServiceImpl) UnlikeComment(ctx context.Context, commentID, userI
 // IsLiked 检查用户是否已点赞
 func (s *commentServiceImpl) IsLiked(ctx context.Context, commentID, userID uuid.UUID) (bool, error) {
 	return s.likeRepo.Exists(ctx, commentID, userID)
+}
+
+// GetLikesBatch 批量检查用户对多个评论的点赞状态
+func (s *commentServiceImpl) GetLikesBatch(ctx context.Context, commentIDs []uuid.UUID, userID uuid.UUID) (map[uuid.UUID]bool, error) {
+	dbLikeRepo, ok := s.likeRepo.(*database.CommentLikeRepository)
+	if ok {
+		return dbLikeRepo.GetLikesBatch(ctx, commentIDs, userID)
+	}
+	// fallback: 逐个查询
+	result := make(map[uuid.UUID]bool)
+	for _, id := range commentIDs {
+		liked, _ := s.likeRepo.Exists(ctx, id, userID)
+		result[id] = liked
+	}
+	return result, nil
 }
 
 // CountCommentsByPost 统计文章评论数量

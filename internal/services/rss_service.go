@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"rua.plus/cadmus/internal/core/post"
 	"rua.plus/cadmus/internal/core/rss"
+	"rua.plus/cadmus/internal/database"
 )
 
 // RSSService RSS 订阅服务接口
@@ -73,6 +74,21 @@ func (s *rssServiceImpl) GenerateFeed(ctx context.Context, config rss.FeedConfig
 	}
 
 	// 添加文章项
+	// 收集所有分类 ID 用于批量查询
+	categoryIDs := make([]uuid.UUID, 0)
+	for _, p := range posts {
+		if p.CategoryID != uuid.Nil {
+			categoryIDs = append(categoryIDs, p.CategoryID)
+		}
+	}
+
+	// 批量查询分类（避免 N+1）
+	categoriesMap := make(map[uuid.UUID]*post.Category)
+	dbCategoryRepo, ok := s.categoryRepo.(*database.CategoryRepository)
+	if ok && len(categoryIDs) > 0 {
+		categoriesMap, _ = dbCategoryRepo.GetByIDs(ctx, categoryIDs)
+	}
+
 	for _, p := range posts {
 		// 获取发布时间
 		pubTime := p.CreatedAt
@@ -88,10 +104,10 @@ func (s *rssServiceImpl) GenerateFeed(ctx context.Context, config rss.FeedConfig
 			GUID:        p.Slug,
 		}
 
-		// 如果有分类，添加分类信息
+		// 如果有分类，添加分类信息（使用预查询的结果）
 		if p.CategoryID != uuid.Nil {
-			category, err := s.categoryRepo.GetByID(ctx, p.CategoryID)
-			if err == nil && category != nil {
+			category := categoriesMap[p.CategoryID]
+			if category != nil {
 				item.Category = category.Name
 			}
 		}
