@@ -528,3 +528,33 @@ func (r *CommentLikeRepository) GetByUserID(ctx context.Context, userID uuid.UUI
 	}
 	return likes, nil
 }
+
+// GetLikesBatch 批量检查用户对多个评论的点赞状态
+// 返回一个 map，key 是 commentID，value 是是否已点赞
+func (r *CommentLikeRepository) GetLikesBatch(ctx context.Context, commentIDs []uuid.UUID, userID uuid.UUID) (map[uuid.UUID]bool, error) {
+	if len(commentIDs) == 0 || userID == uuid.Nil {
+		return make(map[uuid.UUID]bool), nil
+	}
+
+	query := `
+		SELECT comment_id FROM comment_likes
+		WHERE user_id = $1 AND comment_id = ANY($2)
+	`
+
+	rows, err := r.pool.Query(ctx, query, userID, commentIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to batch check comment likes: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID]bool)
+	for rows.Next() {
+		var commentID uuid.UUID
+		if err := rows.Scan(&commentID); err != nil {
+			return nil, fmt.Errorf("failed to scan comment_id: %w", err)
+		}
+		result[commentID] = true
+	}
+
+	return result, nil
+}

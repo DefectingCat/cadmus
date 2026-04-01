@@ -12,12 +12,18 @@ import (
 
 // RoleRepository 角色数据仓库实现
 type RoleRepository struct {
-	pool *Pool
+	pool          *Pool
+	txManager     *TransactionManager
 }
 
 // NewRoleRepository 创建角色仓库
 func NewRoleRepository(pool *Pool) *RoleRepository {
 	return &RoleRepository{pool: pool}
+}
+
+// NewRoleRepositoryWithTxManager 创建带事务管理器的角色仓库
+func NewRoleRepositoryWithTxManager(pool *Pool, txManager *TransactionManager) *RoleRepository {
+	return &RoleRepository{pool: pool, txManager: txManager}
 }
 
 // GetByID 根据 ID 获取角色（不含权限列表）
@@ -221,15 +227,31 @@ func (r *RoleRepository) UpdateDisplayName(ctx context.Context, id uuid.UUID, di
 
 // SetPermissions 设置角色权限（替换现有权限）
 func (r *RoleRepository) SetPermissions(ctx context.Context, roleID uuid.UUID, permissionIDs []uuid.UUID) error {
-	// 使用事务
+	// 如果有事务管理器，使用回调式事务
+	if r.txManager != nil {
+		return r.txManager.WithTransaction(ctx, func(tx pgx.Tx) error {
+			return r.setPermissionsWithTx(ctx, tx, roleID, permissionIDs)
+		})
+	}
+
+	// 否则使用传统事务方式
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
+	if err := r.setPermissionsWithTx(ctx, tx, roleID, permissionIDs); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// setPermissionsWithTx 在给定事务中设置角色权限
+func (r *RoleRepository) setPermissionsWithTx(ctx context.Context, tx pgx.Tx, roleID uuid.UUID, permissionIDs []uuid.UUID) error {
 	// 删除现有权限
-	_, err = tx.Exec(ctx, "DELETE FROM role_permissions WHERE role_id = $1", roleID)
+	_, err := tx.Exec(ctx, "DELETE FROM role_permissions WHERE role_id = $1", roleID)
 	if err != nil {
 		return fmt.Errorf("failed to clear role permissions: %w", err)
 	}
@@ -245,7 +267,7 @@ func (r *RoleRepository) SetPermissions(ctx context.Context, roleID uuid.UUID, p
 		}
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
 
 // GetUserCount 获取使用该角色的用户数量
@@ -281,4 +303,34 @@ func (r *RoleRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+// GetByIDs 批量获取多个角色
+// 返回一个 map，key 是 role ID，value 是角色对象
+func (r *RoleRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*user.Role, error) {
+	if len(ids) == 0 {
+		return make(map[uuid.UUID]*user.Role), nil
+	}
+
+	query := `
+		SELECT id, name, display_name, is_default, created_at
+		FROM roles WHERE id = ANY($1)
+	`
+
+	rows, err := r.pool.Query(ctx, query, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get roles by ids: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID]*user.Role)
+	for rows.Next() {
+		role, err := r.scanRoleFromRow(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan role: %w", err)
+		}
+		result[role.ID] = role
+	}
+
+	return result, nil
 }

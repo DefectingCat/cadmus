@@ -324,3 +324,33 @@ func (r *CategoryRepository) UpdateOrder(ctx context.Context, order []uuid.UUID)
 
 	return nil
 }
+
+// GetByIDs 批量获取多个分类
+// 返回一个 map，key 是 category ID，value 是分类对象
+func (r *CategoryRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*post.Category, error) {
+	if len(ids) == 0 {
+		return make(map[uuid.UUID]*post.Category), nil
+	}
+
+	query := `
+		SELECT id, name, slug, description, parent_id, sort_order, created_at, updated_at
+		FROM categories WHERE id = ANY($1)
+	`
+
+	rows, err := r.pool.Query(ctx, query, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get categories by ids: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID]*post.Category)
+	for rows.Next() {
+		category, err := r.scanCategoryFromRow(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan category: %w", err)
+		}
+		result[category.ID] = category
+	}
+
+	return result, nil
+}

@@ -664,6 +664,38 @@ func (r *PostRepository) CountByAuthor(ctx context.Context, authorID uuid.UUID) 
 	return count, nil
 }
 
+// CountByAuthors 批量统计多个作者的文章数量
+// 返回一个 map，key 是 authorID，value 是文章数量
+func (r *PostRepository) CountByAuthors(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]int, error) {
+	if len(userIDs) == 0 {
+		return make(map[uuid.UUID]int), nil
+	}
+
+	query := `
+		SELECT author_id, COUNT(*) as count
+		FROM posts WHERE author_id = ANY($1)
+		GROUP BY author_id
+	`
+
+	rows, err := r.pool.Query(ctx, query, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count posts by authors: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID]int)
+	for rows.Next() {
+		var authorID uuid.UUID
+		var count int
+		if err := rows.Scan(&authorID, &count); err != nil {
+			return nil, fmt.Errorf("failed to scan author count: %w", err)
+		}
+		result[authorID] = count
+	}
+
+	return result, nil
+}
+
 // MoveCategory 移动文章到指定分类
 func (r *PostRepository) MoveCategory(ctx context.Context, postID, categoryID uuid.UUID) error {
 	query := `UPDATE posts SET category_id = $2 WHERE id = $1`
