@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/a-h/templ"
 	"rua.plus/cadmus/internal/api/handlers"
+	"rua.plus/cadmus/internal/api/middleware"
 	"rua.plus/cadmus/internal/auth"
 	"rua.plus/cadmus/internal/cache"
 	"rua.plus/cadmus/internal/core/comment"
@@ -26,7 +28,30 @@ import (
 	_ "rua.plus/cadmus/themes/default"
 )
 
+// 版本信息（通过 -ldflags 在编译时注入）
+var (
+	version       = "dev"
+	gitCommit     = "unknown"
+	gitBranch     = "unknown"
+	buildTime     = "unknown"
+	goVersion     = "unknown"
+	buildPlatform = "unknown"
+)
+
+// printVersionInfo 打印版本信息
+func printVersionInfo() {
+	fmt.Println("Cadmus Blog Platform")
+	fmt.Printf("  Version:    %s\n", version)
+	fmt.Printf("  Git Commit: %s\n", gitCommit)
+	fmt.Printf("  Git Branch: %s\n", gitBranch)
+	fmt.Printf("  Build Time: %s\n", buildTime)
+	fmt.Printf("  Go Version: %s\n", goVersion)
+	fmt.Printf("  Platform:   %s\n", buildPlatform)
+}
+
 func main() {
+	// 打印版本信息
+	printVersionInfo()
 	// 获取端口配置
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -69,8 +94,14 @@ func main() {
 
 	// 初始化 repositories
 	userRepo := database.NewUserRepository(pool)
-	roleRepo := database.NewRoleRepository(pool)
 	permRepo := database.NewPermissionRepository(pool)
+
+	// 初始化事务管理器
+	txManager := database.NewTransactionManager(pool)
+	log.Println("Transaction manager initialized")
+
+	// 使用事务管理器创建 roleRepo
+	roleRepo := database.NewRoleRepositoryWithTxManager(pool, txManager)
 
 	// 文章相关 repositories
 	postRepo := database.NewPostRepository(pool)
@@ -108,6 +139,12 @@ func main() {
 	permCache := auth.NewPermissionCache(cacheService, permRepo, redisClient.Client())
 	log.Println("Permission cache initialized")
 
+	// 初始化限流器
+	loginLimiter := middleware.NewRateLimiter(redisClient.Client(), middleware.LoginLimit, middleware.LoginWindow)
+	publicLimiter := middleware.NewRateLimiter(redisClient.Client(), middleware.PublicAPILimit, middleware.PublicAPIWindow)
+	userLimiter := middleware.NewRateLimiter(redisClient.Client(), middleware.UserActionLimit, middleware.UserActionWindow)
+	log.Println("Rate limiters initialized")
+
 	// 初始化 Service 容器（带媒体服务）
 	uploadDir := getEnvOrDefault("UPLOAD_DIR", "./uploads")
 	baseURL := getEnvOrDefault("BASE_URL", "http://localhost:"+port)
@@ -130,8 +167,8 @@ func main() {
 
 	// 初始化文章相关处理器
 	postHandler := handlers.NewPostHandler(serviceContainer.PostService)
-	categoryHandler := handlers.NewCategoryHandler(categoryRepo)
-	tagHandler := handlers.NewTagHandler(tagRepo)
+	categoryHandler := handlers.NewCategoryHandler(serviceContainer.CategoryService)
+	tagHandler := handlers.NewTagHandler(serviceContainer.TagService)
 	log.Println("Post handlers initialized")
 
 	// 初始化评论处理器
@@ -167,31 +204,34 @@ func main() {
 	mux := http.NewServeMux()
 
 	// API 路由组
-	// 认证 API
-	mux.HandleFunc("POST /api/v1/auth/register", authHandler.Register)
-	mux.HandleFunc("POST /api/v1/auth/login", authHandler.Login)
+	// 认证 API（应用登录限流：10 次/分钟）
+	loginRateLimit := middleware.RateLimitMiddleware(loginLimiter, middleware.IPKeyFunc("login"))
+	mux.HandleFunc("POST /api/v1/auth/register", loginRateLimit(http.HandlerFunc(authHandler.Register)).ServeHTTP)
+	mux.HandleFunc("POST /api/v1/auth/login", loginRateLimit(http.HandlerFunc(authHandler.Login)).ServeHTTP)
 	mux.HandleFunc("POST /api/v1/auth/logout", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(authHandler.Logout)).ServeHTTP)
 	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("GET /api/v1/auth/me", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(authHandler.Me)).ServeHTTP)
 
-	// 文章 API（公开）
-	mux.HandleFunc("GET /api/v1/posts", postHandler.List)
-	mux.HandleFunc("GET /api/v1/posts/{slug}", postHandler.Get)
-	mux.HandleFunc("GET /api/v1/posts/{id}/versions", postHandler.Versions)
-	mux.HandleFunc("GET /api/v1/users/{id}/posts", postHandler.GetUserPosts)
+	// 文章 API（公开，应用限流：60 次/分钟）
+	publicRateLimit := middleware.RateLimitMiddleware(publicLimiter, middleware.IPKeyFunc("public"))
+	mux.HandleFunc("GET /api/v1/posts", publicRateLimit(http.HandlerFunc(postHandler.List)).ServeHTTP)
+	mux.HandleFunc("GET /api/v1/posts/{slug}", publicRateLimit(http.HandlerFunc(postHandler.Get)).ServeHTTP)
+	mux.HandleFunc("GET /api/v1/posts/{id}/versions", publicRateLimit(http.HandlerFunc(postHandler.Versions)).ServeHTTP)
+	mux.HandleFunc("GET /api/v1/users/{id}/posts", publicRateLimit(http.HandlerFunc(postHandler.GetUserPosts)).ServeHTTP)
 
-	// 搜索 API（公开）
-	mux.HandleFunc("GET /api/v1/search", searchHandler.Search)
-	mux.HandleFunc("GET /api/v1/search/suggestions", searchHandler.Suggestions)
+	// 搜索 API（公开，应用限流：60 次/分钟）
+	mux.HandleFunc("GET /api/v1/search", publicRateLimit(http.HandlerFunc(searchHandler.Search)).ServeHTTP)
+	mux.HandleFunc("GET /api/v1/search/suggestions", publicRateLimit(http.HandlerFunc(searchHandler.Suggestions)).ServeHTTP)
 
-	// 文章 API（需认证）
-	mux.HandleFunc("POST /api/v1/posts", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Create)).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/posts/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Update)).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/posts/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Delete)).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/posts/{id}/publish", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Publish)).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/posts/{id}/rollback", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Rollback)).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/posts/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Like)).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/posts/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Unlike)).ServeHTTP)
+	// 文章 API（需认证，应用限流：100 次/分钟）
+	userRateLimit := middleware.RateLimitMiddleware(userLimiter, middleware.IPKeyFunc("user"))
+	mux.HandleFunc("POST /api/v1/posts", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Create))).ServeHTTP)
+	mux.HandleFunc("PUT /api/v1/posts/{id}", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Update))).ServeHTTP)
+	mux.HandleFunc("DELETE /api/v1/posts/{id}", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Delete))).ServeHTTP)
+	mux.HandleFunc("POST /api/v1/posts/{id}/publish", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Publish))).ServeHTTP)
+	mux.HandleFunc("POST /api/v1/posts/{id}/rollback", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Rollback))).ServeHTTP)
+	mux.HandleFunc("POST /api/v1/posts/{id}/like", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Like))).ServeHTTP)
+	mux.HandleFunc("DELETE /api/v1/posts/{id}/like", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Unlike))).ServeHTTP)
 
 	// 分类 API
 	mux.HandleFunc("GET /api/v1/categories", categoryHandler.List)
