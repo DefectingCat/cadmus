@@ -19,7 +19,21 @@ LDFLAGS := -s -w \
     -X 'main.goVersion=$(GO_VERSION)' \
     -X 'main.buildPlatform=$(BUILD_PLATFORM)'
 
-.PHONY: build build/frontend build/backend build/editor version
+.PHONY: build build/frontend build/backend build/editor version test test/coverage test/bench
+
+# 运行所有测试（带竞态检测）
+test:
+	go test -v -race ./...
+
+# 生成覆盖率报告
+test/coverage:
+	go test -v -race -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+# 运行基准测试
+test/bench:
+	go test -bench=. -benchmem ./...
 
 # 默认目标：构建全部
 build:
