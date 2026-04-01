@@ -1,3 +1,20 @@
+// Package services 提供通知服务的实现。
+//
+// 该文件包含通知推送相关的核心逻辑，包括：
+//   - 评论通知（通知文章作者）
+//   - 回复通知（通知被回复用户）
+//   - 通用通知发送
+//
+// 主要用途：
+//
+//	用于向用户推送各类通知，提升用户互动体验。
+//
+// 设计特点：
+//   - 支持多种通知渠道（邮件、WebPush 等）
+//   - 自动跳过自我通知（评论者即作者）
+//   - 渠道可选配置（无渠道时静默跳过）
+//
+// 作者：xfy
 package services
 
 import (
@@ -12,22 +29,49 @@ import (
 	"rua.plus/cadmus/internal/core/user"
 )
 
-// NotificationService 通知服务接口
+// NotificationService 通知服务接口。
+//
+// 该接口定义了通知推送的操作，支持评论通知和回复通知。
 type NotificationService interface {
-	// SendCommentNotification 发送评论通知（通知文章作者）
-	// postAuthor: 文章作者（收件人）
-	// commentAuthor: 评论者
+	// SendCommentNotification 发送评论通知给文章作者。
+	//
+	// 当用户对文章发表评论时，通知文章作者。
+	// 如果评论者就是文章作者，则跳过通知。
+	//
+	// 参数：
+	//   - ctx: 上下文
+	//   - comment: 评论对象
+	//   - post: 文章对象
+	//   - postAuthor: 文章作者（收件人）
+	//   - commentAuthor: 评论者（用于显示名称）
+	//
+	// 返回值：
+	//   - error: 发送失败时返回错误
 	SendCommentNotification(ctx context.Context, comment *comment.Comment, post *post.Post, postAuthor *user.User, commentAuthor *user.User) error
 
-	// SendReplyNotification 发送回复通知（通知被回复用户）
+	// SendReplyNotification 发送回复通知给被回复用户。
+	//
+	// 当用户回复某条评论时，通知原评论作者。
+	// 如果回复者就是被回复者，则跳过通知。
+	//
+	// 参数：
+	//   - reply: 回复评论对象
+	//   - parentComment: 被回复的评论
+	//   - post: 文章对象
+	//   - replyAuthor: 回复者
+	//   - parentAuthor: 被回复者（收件人）
 	SendReplyNotification(ctx context.Context, reply *comment.Comment, parentComment *comment.Comment, post *post.Post, replyAuthor *user.User, parentAuthor *user.User) error
 
-	// Send 发送通用通知
+	// Send 发送通用通知。
+	//
+	// 通过配置的通知渠道发送任意类型的通知。
+	// 如果未配置渠道或收件人为空，则静默跳过。
 	Send(ctx context.Context, notification *notify.Notification) error
 }
 
-// notificationServiceImpl 通知服务实现
+// notificationServiceImpl 通知服务的具体实现。
 type notificationServiceImpl struct {
+	// channel 通知渠道（邮件、WebPush 等）
 	channel notify.NotificationChannel
 }
 

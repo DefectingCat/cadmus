@@ -1,3 +1,21 @@
+// Package services 提供 RSS 订阅服务的实现。
+//
+// 该文件包含 RSS 订阅源生成相关的核心逻辑，包括：
+//   - RSS 2.0 格式 XML 生成
+//   - 全站订阅源生成
+//   - 分类订阅源生成
+//   - 批量查询优化（避免 N+1 问题）
+//
+// 主要用途：
+//
+//	用于生成标准的 RSS 订阅源，供用户订阅博客更新。
+//
+// 设计特点：
+//   - 符合 RSS 2.0 规范
+//   - 支持分类过滤订阅
+//   - 批量查询分类信息优化性能
+//
+// 作者：xfy
 package services
 
 import (
@@ -11,22 +29,52 @@ import (
 	"rua.plus/cadmus/internal/database"
 )
 
-// RSSService RSS 订阅服务接口
+// RSSService RSS 订阅服务接口。
+//
+// 该接口定义了 RSS 订阅源生成的操作，符合 RSS 2.0 规范。
 type RSSService interface {
-	// GenerateFeed 生成 RSS 订阅源 XML
+	// GenerateFeed 生成 RSS 订阅源 XML。
+	//
+	// 参数：
+	//   - ctx: 上下文
+	//   - config: RSS 配置（标题、链接、描述等）
+	//   - categorySlug: 分类 Slug（可选，为空则生成全站订阅）
+	//
+	// 返回值：
+	//   - string: 格式化的 RSS XML 字符串
+	//   - error: 生成失败时返回错误
 	GenerateFeed(ctx context.Context, config rss.FeedConfig, categorySlug string) (string, error)
 
-	// GenerateFeedForCategory 生成指定分类的 RSS 订阅源
+	// GenerateFeedForCategory 生成指定分类的 RSS 订阅源。
+	//
+	// 参数：
+	//   - ctx: 上下文
+	//   - config: RSS 配置
+	//   - categoryID: 分类 ID（字符串格式）
+	//
+	// 返回值：
+	//   - string: 分类专属的 RSS XML
+	//   - error: 分类不存在时返回全站订阅
 	GenerateFeedForCategory(ctx context.Context, config rss.FeedConfig, categoryID string) (string, error)
 }
 
-// rssServiceImpl RSS 服务实现
+// rssServiceImpl RSS 服务的具体实现。
 type rssServiceImpl struct {
-	postRepo     post.PostRepository
+	// postRepo 文章数据仓库
+	postRepo post.PostRepository
+
+	// categoryRepo 分类数据仓库
 	categoryRepo post.CategoryRepository
 }
 
-// NewRSSService 创建 RSS 服务
+// NewRSSService 创建 RSS 服务实例。
+//
+// 参数：
+//   - postRepo: 文章数据仓库
+//   - categoryRepo: 分类数据仓库
+//
+// 返回值：
+//   - RSSService: RSS 服务实例
 func NewRSSService(
 	postRepo post.PostRepository,
 	categoryRepo post.CategoryRepository,

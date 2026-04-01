@@ -1,3 +1,20 @@
+// Package services 提供邮件通知渠道的实现。
+//
+// 该文件包含邮件发送相关的核心逻辑，包括：
+//   - SMTP 邮件发送
+//   - 评论通知邮件模板渲染
+//   - 回复通知邮件模板渲染
+//
+// 主要用途：
+//
+//	用于通过邮件向用户发送各类通知。
+//
+// 设计特点：
+//   - 使用 Go 标准库 net/smtp 发送邮件
+//   - 内置通知模板，支持自定义内容
+//   - 支持 UTF-8 编码
+//
+// 作者：xfy
 package services
 
 import (
@@ -9,19 +26,38 @@ import (
 	"rua.plus/cadmus/internal/core/notify"
 )
 
-// EmailChannel 邮件通知渠道实现
+// EmailChannel 邮件通知渠道实现。
+//
+// 该结构体实现了 NotificationChannel 接口，通过 SMTP 协议发送邮件。
+// 支持评论通知和回复通知的模板渲染。
 type EmailChannel struct {
+	// config SMTP 配置（主机、端口、认证信息）
 	config *notify.SMTPConfig
 }
 
-// NewEmailChannel 创建邮件渠道
+// NewEmailChannel 创建邮件渠道实例。
+//
+// 参数：
+//   - config: SMTP 配置对象
+//
+// 返回值：
+//   - *EmailChannel: 邮件渠道实例
 func NewEmailChannel(config *notify.SMTPConfig) *EmailChannel {
 	return &EmailChannel{
 		config: config,
 	}
 }
 
-// Send 发送邮件通知
+// Send 发送邮件通知。
+//
+// 根据通知类型选择对应的邮件模板进行渲染，
+// 然后通过 SMTP 协议发送邮件。
+//
+// 参数：
+//   - notification: 通知对象，包含收件人、主题、类型和数据
+//
+// 返回值：
+//   - error: 发送失败时返回错误
 func (e *EmailChannel) Send(notification *notify.Notification) error {
 	if e.config == nil {
 		return fmt.Errorf("SMTP config is nil")

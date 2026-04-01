@@ -1,3 +1,22 @@
+// Package services 提供媒体服务的实现。
+//
+// 该文件包含媒体文件管理相关的核心逻辑，包括：
+//   - 文件上传（支持多种 MIME 类型）
+//   - 文件大小限制验证
+//   - 唯一文件名生成
+//   - 媒体元数据管理
+//   - 文件删除（同时删除物理文件）
+//
+// 主要用途：
+//
+//	用于处理用户上传媒体文件的完整生命周期管理。
+//
+// 安全设计：
+//   - 文件大小限制（默认 10MB）
+//   - MIME 类型白名单验证
+//   - 权限检查（仅上传者可删除）
+//
+// 作者：xfy
 package services
 
 import (
@@ -12,37 +31,73 @@ import (
 
 	"github.com/google/uuid"
 	"rua.plus/cadmus/internal/core/media"
+	"rua.plus/cadmus/internal/logger"
 )
 
-// MaxFileSize 最大文件大小限制（10MB）
+// MaxFileSize 最大文件大小限制。
+//
+// 设为 10MB，平衡服务器存储成本和用户上传需求。
+// 超过此大小的文件将被拒绝上传。
 const MaxFileSize = 10 * 1024 * 1024
 
-// MediaService 媒体业务服务接口
+// MediaService 媒体业务服务接口。
+//
+// 该接口定义了媒体文件管理的核心操作，包括上传、查询和删除。
+// 所有方法均为并发安全。
 type MediaService interface {
-	// Upload 上传文件
+	// Upload 上传文件，保存到存储后端并创建数据库记录。
+	//
+	// 参数：
+	//   - ctx: 上下文
+	//   - userID: 上传用户 ID（用于权限验证）
+	//   - file: 上传的文件对象（来自 multipart 表单）
+	//   - altText: 替代文本（用于无障碍访问）
+	//
+	// 返回值：
+	//   - media: 创建的媒体对象
+	//   - err: 可能的错误包括文件过大、MIME 类型不支持
+	//
+	// 使用示例：
+	//   m, err := mediaService.Upload(ctx, userID, fileHeader, &altText)
 	Upload(ctx context.Context, userID uuid.UUID, file *multipart.FileHeader, altText *string) (*media.Media, error)
 
-	// GetByID 根据 ID 获取媒体
+	// GetByID 根据 ID 获取媒体信息。
 	GetByID(ctx context.Context, id uuid.UUID) (*media.Media, error)
 
-	// GetByUser 获取用户上传的媒体
+	// GetByUser 获取用户上传的所有媒体。
 	GetByUser(ctx context.Context, userID uuid.UUID) ([]*media.Media, error)
 
-	// Delete 删除媒体（需验证权限）
+	// Delete 删除媒体，需验证权限。
+	//
+	// 仅上传者可以删除自己上传的媒体。
+	// 删除操作会同时删除数据库记录和物理文件。
 	Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 
-	// List 分页获取媒体列表
+	// List 分页获取媒体列表，支持筛选。
 	List(ctx context.Context, filters *media.MediaListFilters, offset, limit int) ([]*media.Media, int, error)
 }
 
-// mediaServiceImpl 媒体服务实现
+// mediaServiceImpl 媒体服务的具体实现。
 type mediaServiceImpl struct {
-	mediaRepo  media.MediaRepository
-	uploadDir  string
-	baseURL    string
+	// mediaRepo 媒体数据仓库
+	mediaRepo media.MediaRepository
+
+	// uploadDir 文件上传目录（物理存储路径）
+	uploadDir string
+
+	// baseURL 基础 URL（用于生成文件访问链接）
+	baseURL string
 }
 
-// NewMediaService 创建媒体服务
+// NewMediaService 创建媒体服务实例。
+//
+// 参数：
+//   - mediaRepo: 媒体数据仓库
+//   - uploadDir: 文件存储目录路径
+//   - baseURL: 外部访问的基础 URL
+//
+// 返回值：
+//   - MediaService: 媒体服务实例
 func NewMediaService(mediaRepo media.MediaRepository, uploadDir, baseURL string) MediaService {
 	return &mediaServiceImpl{
 		mediaRepo: mediaRepo,
@@ -162,7 +217,7 @@ func (s *mediaServiceImpl) Delete(ctx context.Context, id uuid.UUID, userID uuid
 	// 删除物理文件
 	if err := os.Remove(m.FilePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		// 文件删除失败但数据库记录已删除，记录日志但不返回错误
-		fmt.Printf("warning: failed to delete file %s: %v\n", m.FilePath, err)
+		logger.Warn(fmt.Sprintf("warning: failed to delete file %s: %v", m.FilePath, err))
 	}
 
 	return nil
