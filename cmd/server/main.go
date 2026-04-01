@@ -10,22 +10,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/a-h/templ"
 	"rua.plus/cadmus/internal/api/handlers"
 	"rua.plus/cadmus/internal/api/middleware"
 	"rua.plus/cadmus/internal/auth"
 	"rua.plus/cadmus/internal/cache"
-	"rua.plus/cadmus/internal/core/comment"
-	"rua.plus/cadmus/internal/core/post"
 	"rua.plus/cadmus/internal/core/rss"
 	"rua.plus/cadmus/internal/database"
 	"rua.plus/cadmus/internal/services"
 	_ "rua.plus/cadmus/plugins/mermaid-block" // 启用 Mermaid 图表块插件（blank import 触发 init）
-	"rua.plus/cadmus/web/templates/pages"
-	adminpages "rua.plus/cadmus/web/templates/pages/admin"
-
-	// 启用默认主题（blank import 触发 init()）
-	_ "rua.plus/cadmus/themes/default"
+	_ "rua.plus/cadmus/themes/default"        // 启用默认主题（blank import 触发 init()）
 )
 
 // 版本信息（通过 -ldflags 在编译时注入）
@@ -52,90 +45,55 @@ func printVersionInfo() {
 func main() {
 	// 打印版本信息
 	printVersionInfo()
-	// 获取端口配置
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
 
-	// 初始化数据库连接池
-	dbCfg := database.DefaultConfig()
-	dbCfg.Host = getEnvOrDefault("DB_HOST", "localhost")
-	dbCfg.Port = atoi(getEnvOrDefault("DB_PORT", "5432"))
-	dbCfg.Name = getEnvOrDefault("DB_NAME", "cadmus")
-	dbCfg.User = getEnvOrDefault("DB_USER", "cadmus")
-	dbCfg.Password = getEnvOrDefault("DB_PASSWORD", "")
-	dbCfg.SSLMode = getEnvOrDefault("DB_SSLMODE", "disable")
+	// 加载配置
+	cfg := loadConfig()
 
+	// 初始化基础设施
 	ctx := context.Background()
-	pool, err := database.NewPool(ctx, dbCfg)
+	pool, err := database.NewPool(ctx, cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer pool.Close()
 	log.Println("Database connection pool initialized")
 
-	// 初始化 Redis 连接池
-	redisCfg := cache.DefaultConfig()
-	redisCfg.Host = getEnvOrDefault("REDIS_HOST", "localhost")
-	redisCfg.Port = atoi(getEnvOrDefault("REDIS_PORT", "6379"))
-	redisCfg.Password = getEnvOrDefault("REDIS_PASSWORD", "")
-
-	redisClient, err := cache.NewRedisClient(redisCfg)
+	redisClient, err := cache.NewRedisClient(cfg.Redis)
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 	defer redisClient.Close()
 	log.Println("Redis connection pool initialized")
 
-	// 初始化缓存服务
 	cacheService := cache.NewService(redisClient)
 	log.Println("Cache service initialized")
 
 	// 初始化 repositories
 	userRepo := database.NewUserRepository(pool)
 	permRepo := database.NewPermissionRepository(pool)
-
-	// 初始化事务管理器
 	txManager := database.NewTransactionManager(pool)
 	log.Println("Transaction manager initialized")
 
-	// 使用事务管理器创建 roleRepo
 	roleRepo := database.NewRoleRepositoryWithTxManager(pool, txManager)
-
-	// 文章相关 repositories
 	postRepo := database.NewPostRepository(pool)
 	categoryRepo := database.NewCategoryRepository(pool)
 	tagRepo := database.NewTagRepository(pool)
 	seriesRepo := database.NewSeriesRepository(pool)
-
-	// 评论相关 repositories
 	commentRepo := database.NewCommentRepository(pool)
 	commentLikeRepo := database.NewCommentLikeRepository(pool)
-
-	// 文章点赞 repository
 	postLikeRepo := database.NewPostLikeRepository(pool)
-
-	// 媒体相关 repositories
 	mediaRepo := database.NewMediaRepository(pool)
-
-	// 搜索相关 repositories
 	searchRepo := database.NewSearchRepository(pool)
 	log.Println("Repositories initialized")
 
 	// 初始化 JWT 服务
-	jwtCfg, err := auth.DefaultJWTConfig()
-	if err != nil {
-		log.Fatalf("JWT config error: %v", err)
-	}
-	jwtService := auth.NewJWTService(jwtCfg)
+	jwtService := auth.NewJWTService(cfg.JWT)
 	log.Println("JWT service initialized")
 
-	// 初始化 token 黑名单
+	// 初始化 token 黑名单和权限缓存
 	tokenBlacklist := auth.NewRedisTokenBlacklist(redisClient)
 	log.Println("Token blacklist initialized")
 
-	// 初始化权限缓存
 	permCache := auth.NewPermissionCache(cacheService, permRepo, redisClient.Client())
 	log.Println("Permission cache initialized")
 
@@ -145,52 +103,34 @@ func main() {
 	userLimiter := middleware.NewRateLimiter(redisClient.Client(), middleware.UserActionLimit, middleware.UserActionWindow)
 	log.Println("Rate limiters initialized")
 
-	// 初始化 Service 容器（带媒体服务）
-	uploadDir := getEnvOrDefault("UPLOAD_DIR", "./uploads")
-	baseURL := getEnvOrDefault("BASE_URL", "http://localhost:"+port)
+	// 初始化 Service 容器
 	serviceContainer := services.NewContainerWithMedia(
 		userRepo, roleRepo, jwtService, tokenBlacklist,
 		postRepo, categoryRepo, tagRepo, seriesRepo,
 		commentRepo, commentLikeRepo,
-		mediaRepo, uploadDir, baseURL, postLikeRepo, searchRepo,
+		mediaRepo, cfg.Upload.Dir, cfg.Upload.BaseURL, postLikeRepo, searchRepo,
 	)
 	log.Println("Service container initialized")
 
-	// 初始化认证处理器（通过 Service 层）
+	// 初始化 handlers
 	authHandler := handlers.NewAuthHandlerWithServices(
 		serviceContainer.AuthService,
 		serviceContainer.UserService,
 		serviceContainer.JWTService(),
 		roleRepo,
 	)
-	log.Println("Auth handlers initialized")
-
-	// 初始化文章相关处理器
 	postHandler := handlers.NewPostHandler(serviceContainer.PostService)
 	categoryHandler := handlers.NewCategoryHandler(serviceContainer.CategoryService)
 	tagHandler := handlers.NewTagHandler(serviceContainer.TagService)
-	log.Println("Post handlers initialized")
-
-	// 初始化评论处理器
 	commentHandler := handlers.NewCommentHandler(serviceContainer.CommentService)
-	log.Println("Comment handlers initialized")
-
-	// 初始化媒体处理器
 	mediaHandler := handlers.NewMediaHandler(serviceContainer.MediaService)
-	log.Println("Media handlers initialized")
-
-	// 初始化 RSS 处理器
-	rssConfig := rss.DefaultFeedConfig()
-	rssConfig.BaseURL = baseURL + "/posts"
-	rssConfig.Link = baseURL
-	rssHandler := handlers.NewRSSHandler(serviceContainer.RSSService, rssConfig)
-	log.Println("RSS handlers initialized")
-
-	// 初始化搜索处理器
 	searchHandler := handlers.NewSearchHandler(serviceContainer.SearchService)
-	log.Println("Search handlers initialized")
 
-	// 初始化管理员处理器
+	rssConfig := rss.DefaultFeedConfig()
+	rssConfig.BaseURL = cfg.Upload.BaseURL + "/posts"
+	rssConfig.Link = cfg.Upload.BaseURL
+	rssHandler := handlers.NewRSSHandler(serviceContainer.RSSService, rssConfig)
+
 	adminHandler := handlers.NewAdminHandler(
 		userRepo, roleRepo, permRepo,
 		postRepo, categoryRepo, tagRepo, commentRepo,
@@ -198,188 +138,53 @@ func main() {
 		jwtService,
 		permCache,
 	)
-	log.Println("Admin handlers initialized")
+	log.Println("Handlers initialized")
 
-	// 创建路由
+	// 配置路由
 	mux := http.NewServeMux()
+	routeDeps := &RouteDeps{
+		AuthHandler:     authHandler,
+		PostHandler:     postHandler,
+		CategoryHandler: categoryHandler,
+		TagHandler:      tagHandler,
+		CommentHandler:  commentHandler,
+		MediaHandler:    mediaHandler,
+		RSSHandler:      rssHandler,
+		SearchHandler:   searchHandler,
+		AdminHandler:    adminHandler,
+		LoginLimiter:    loginLimiter,
+		PublicLimiter:   publicLimiter,
+		UserLimiter:     userLimiter,
+		JWTService:      jwtService,
+		TokenBlacklist:  tokenBlacklist,
+		PermCache:       permCache,
+		PostRepo:        postRepo,
+		CommentRepo:     commentRepo,
+		Services:        serviceContainer,
+		UploadDir:       cfg.Upload.Dir,
+	}
+	setupRoutes(mux, routeDeps)
 
-	// API 路由组
-	// 认证 API（应用登录限流：10 次/分钟）
-	loginRateLimit := middleware.RateLimitMiddleware(loginLimiter, middleware.IPKeyFunc("login"))
-	mux.HandleFunc("POST /api/v1/auth/register", loginRateLimit(http.HandlerFunc(authHandler.Register)).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/auth/login", loginRateLimit(http.HandlerFunc(authHandler.Login)).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/auth/logout", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(authHandler.Logout)).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/auth/refresh", authHandler.Refresh)
-	mux.HandleFunc("GET /api/v1/auth/me", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(authHandler.Me)).ServeHTTP)
-
-	// 文章 API（公开，应用限流：60 次/分钟）
-	publicRateLimit := middleware.RateLimitMiddleware(publicLimiter, middleware.IPKeyFunc("public"))
-	mux.HandleFunc("GET /api/v1/posts", publicRateLimit(http.HandlerFunc(postHandler.List)).ServeHTTP)
-	mux.HandleFunc("GET /api/v1/posts/{slug}", publicRateLimit(http.HandlerFunc(postHandler.Get)).ServeHTTP)
-	mux.HandleFunc("GET /api/v1/posts/{id}/versions", publicRateLimit(http.HandlerFunc(postHandler.Versions)).ServeHTTP)
-	mux.HandleFunc("GET /api/v1/users/{id}/posts", publicRateLimit(http.HandlerFunc(postHandler.GetUserPosts)).ServeHTTP)
-
-	// 搜索 API（公开，应用限流：60 次/分钟）
-	mux.HandleFunc("GET /api/v1/search", publicRateLimit(http.HandlerFunc(searchHandler.Search)).ServeHTTP)
-	mux.HandleFunc("GET /api/v1/search/suggestions", publicRateLimit(http.HandlerFunc(searchHandler.Suggestions)).ServeHTTP)
-
-	// 文章 API（需认证，应用限流：100 次/分钟）
-	userRateLimit := middleware.RateLimitMiddleware(userLimiter, middleware.IPKeyFunc("user"))
-	mux.HandleFunc("POST /api/v1/posts", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Create))).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/posts/{id}", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Update))).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/posts/{id}", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Delete))).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/posts/{id}/publish", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Publish))).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/posts/{id}/rollback", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Rollback))).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/posts/{id}/like", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Like))).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/posts/{id}/like", userRateLimit(handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(postHandler.Unlike))).ServeHTTP)
-
-	// 分类 API
-	mux.HandleFunc("GET /api/v1/categories", categoryHandler.List)
-	mux.HandleFunc("GET /api/v1/categories/{slug}", categoryHandler.Get)
-	mux.HandleFunc("POST /api/v1/categories", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(categoryHandler.Create)).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/categories/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(categoryHandler.Update)).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/categories/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(categoryHandler.Delete)).ServeHTTP)
-
-	// 标签 API
-	mux.HandleFunc("GET /api/v1/tags", tagHandler.List)
-	mux.HandleFunc("GET /api/v1/tags/{slug}", tagHandler.Get)
-	mux.HandleFunc("POST /api/v1/tags", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(tagHandler.Create)).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/tags/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(tagHandler.Delete)).ServeHTTP)
-
-	// 评论 API（公开）
-	mux.HandleFunc("GET /api/v1/comments/post/{postId}", commentHandler.GetByPost)
-
-	// 评论 API（需认证）
-	mux.HandleFunc("POST /api/v1/comments", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Create)).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/comments/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Update)).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/comments/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Delete)).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/comments/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Like)).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/comments/{id}/like", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(commentHandler.Unlike)).ServeHTTP)
-
-	// 评论审核 API（需认证，需 comment:moderate 权限）
-	mux.HandleFunc("PUT /api/v1/comments/{id}/approve", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.Approve)).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/comments/{id}/reject", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.Reject)).ServeHTTP)
-
-	// 评论管理后台 API（需 comment:moderate 权限）
-	mux.HandleFunc("GET /api/v1/admin/comments", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.AdminListComments)).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/admin/comments/batch-approve", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.BatchApprove)).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/admin/comments/batch-reject", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.BatchReject)).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/admin/comments/batch-delete", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.BatchDelete)).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/admin/comments/{id}", handlers.CachedPermissionMiddleware(jwtService, permCache, "comment:moderate")(http.HandlerFunc(commentHandler.AdminDeleteComment)).ServeHTTP)
-
-	// 媒体 API（需认证）
-	mux.HandleFunc("POST /api/v1/media/upload", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Upload)).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/media/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Delete)).ServeHTTP)
-	mux.HandleFunc("GET /api/v1/media", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.List)).ServeHTTP)
-	mux.HandleFunc("GET /api/v1/media/{id}", handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)(http.HandlerFunc(mediaHandler.Get)).ServeHTTP)
-
-	// RSS 订阅 API（公开）
-	mux.HandleFunc("GET /api/v1/rss", rssHandler.Feed)
-
-	// 管理员 API（需认证和管理员权限）
-	adminAuth := handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)
-	adminPerm := handlers.AdminMiddleware(permCache)
-
-	// 角色管理
-	mux.HandleFunc("GET /api/v1/admin/roles", adminAuth(adminPerm(http.HandlerFunc(adminHandler.ListRoles))).ServeHTTP)
-	mux.HandleFunc("POST /api/v1/admin/roles", adminAuth(adminPerm(http.HandlerFunc(adminHandler.CreateRole))).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/admin/roles/{id}", adminAuth(adminPerm(http.HandlerFunc(adminHandler.UpdateRole))).ServeHTTP)
-	mux.HandleFunc("DELETE /api/v1/admin/roles/{id}", adminAuth(adminPerm(http.HandlerFunc(adminHandler.DeleteRole))).ServeHTTP)
-
-	// 用户管理
-	mux.HandleFunc("GET /api/v1/admin/users", adminAuth(adminPerm(http.HandlerFunc(adminHandler.ListUsers))).ServeHTTP)
-	mux.HandleFunc("PUT /api/v1/admin/users/{id}/ban", adminAuth(adminPerm(http.HandlerFunc(adminHandler.BanUser))).ServeHTTP)
-
-	// 批量操作
-	mux.HandleFunc("POST /api/v1/admin/batch", adminAuth(adminPerm(http.HandlerFunc(adminHandler.BatchOperation))).ServeHTTP)
-
-	// 排序更新
-	mux.HandleFunc("PUT /api/v1/admin/order", adminAuth(adminPerm(http.HandlerFunc(adminHandler.UpdateOrder))).ServeHTTP)
-
-	// 健康检查端点
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-
-	// 首页
-	mux.Handle("/", templ.Handler(pages.HomePage("Cadmus - 博客平台")))
-
-	// 管理后台页面（需要认证和管理员权限）
-	adminPageAuth := handlers.AuthMiddlewareWithBlacklist(jwtService, tokenBlacklist)
-	adminPagePerm := handlers.AdminMiddleware(permCache)
-
-	// 仪表盘
-	mux.Handle("GET /admin", adminPageAuth(adminPagePerm(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		// 获取统计数据
-		filters := post.PostListFilters{}
-		recentPosts, postCount, _ := postRepo.List(ctx, filters, 0, 5)
-
-		commentFilters := &comment.CommentListFilters{}
-		recentComments, _ := commentRepo.List(ctx, commentFilters, 0, 5)
-
-		pendingFilters := &comment.CommentListFilters{Status: comment.StatusPending}
-		pendingComments, _ := commentRepo.List(ctx, pendingFilters, 0, 100)
-		pendingCount := len(pendingComments)
-
-		// 获取用户数
-		_, userCount, _ := serviceContainer.UserService.List(ctx, 0, 1)
-
-		stats := adminpages.DashboardStats{
-			TotalPosts:    postCount,
-			TotalViews:    0, // 暂无总浏览统计
-			TotalComments: 0, // 暂无总评论统计
-			TotalUsers:    userCount,
-			ActiveTheme:   "default",
-		}
-
-		templ.Handler(adminpages.DashboardPage(stats, recentPosts, recentComments, pendingCount)).ServeHTTP(w, r)
-	}))))
-
-	// 评论管理
-	mux.Handle("GET /admin/comments", adminPageAuth(adminPagePerm(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 获取查询参数
-		status := r.URL.Query().Get("status")
-		if status == "" {
-			status = "pending"
-		}
-		pageStr := r.URL.Query().Get("page")
-		page := 1
-		if pageStr != "" {
-			if p, err := parseIntStr(pageStr); err == nil && p > 0 {
-				page = p
-			}
-		}
-		perPage := 20
-
-		// 获取评论列表
-		comments, total, err := serviceContainer.CommentService.GetCommentsByStatus(r.Context(), comment.CommentStatus(status), (page-1)*perPage, perPage)
-		if err != nil {
-			http.Error(w, "获取评论失败", http.StatusInternalServerError)
+	// 添加首页路由（不在 routes.go 中，因为它需要 templ import）
+	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
 			return
 		}
-
-		templ.Handler(adminpages.AdminCommentsPage("评论管理 - Cadmus", status, comments, page, perPage, total)).ServeHTTP(w, r)
-	}))))
-
-	// 静态文件服务
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
-
-	// 上传文件静态服务
-	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadDir))))
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(`<!DOCTYPE html><html><head><title>Cadmus - 博客平台</title></head><body><h1>Welcome to Cadmus</h1></body></html>`))
+	}))
 
 	// 创建 HTTP server
 	server := &http.Server{
-		Addr:         ":" + port,
+		Addr:         ":" + cfg.Server.Port,
 		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
+		IdleTimeout:  cfg.Server.IdleTimeout,
 	}
 
-	// 启动服务器（在 goroutine 中）
+	// 启动服务器
 	go func() {
 		log.Printf("Cadmus server starting on %s", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -401,37 +206,3 @@ func main() {
 	}
 	log.Println("Server stopped")
 }
-
-// getEnvOrDefault 获取环境变量或默认值
-func getEnvOrDefault(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
-// atoi 字符串转整数
-func atoi(s string) int {
-	var n int
-	for _, c := range s {
-		if c >= '0' && c <= '9' {
-			n = n*10 + int(c-'0')
-		}
-	}
-	return n
-}
-
-// parseIntStr 解析整数字符串
-func parseIntStr(s string) (int, error) {
-	var n int
-	for _, c := range s {
-		if c >= '0' && c <= '9' {
-			n = n*10 + int(c-'0')
-		} else {
-			return 0, nil
-		}
-	}
-	return n, nil
-}
-
