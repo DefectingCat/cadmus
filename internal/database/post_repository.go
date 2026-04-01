@@ -104,7 +104,7 @@ func (r *PostRepository) Create(ctx context.Context, p *post.Post) error {
 	)
 
 	if err != nil {
-		if isUniqueViolation(err, "posts_slug_key") {
+		if IsUniqueViolation(err, "posts_slug_key") {
 			return post.ErrPostAlreadyExists
 		}
 		return fmt.Errorf("failed to create post: %w", err)
@@ -154,7 +154,7 @@ func (r *PostRepository) Update(ctx context.Context, p *post.Post) error {
 	)
 
 	if err != nil {
-		if isUniqueViolation(err, "posts_slug_key") {
+		if IsUniqueViolation(err, "posts_slug_key") {
 			return post.ErrPostAlreadyExists
 		}
 		return fmt.Errorf("failed to update post: %w", err)
@@ -555,96 +555,31 @@ func (r *PostRepository) scanPostFromRow(row pgx.Rows) (*post.Post, error) {
 	return p, nil
 }
 
-// PostLikeRepository 文章点赞仓库实现
+
+// PostLikeRepository 文章点赞仓库实现。
+//
+// 包装 BaseLikeRepository 提供文章点赞功能，保持接口兼容。
 type PostLikeRepository struct {
-	pool *Pool
+	*BaseLikeRepository
 }
 
-// NewPostLikeRepository 创建文章点赞仓库
+// NewPostLikeRepository 创建文章点赞仓库。
 func NewPostLikeRepository(pool *Pool) *PostLikeRepository {
-	return &PostLikeRepository{pool: pool}
+	return &PostLikeRepository{
+		BaseLikeRepository: NewBaseLikeRepository(pool, PostLikeConfig()),
+	}
 }
 
-// CreateIfNotExists 创建点赞记录（使用 ON CONFLICT DO NOTHING），返回是否实际创建
-// 同时原子更新文章的点赞计数
-func (r *PostLikeRepository) CreateIfNotExists(ctx context.Context, postID, userID uuid.UUID) (created bool, err error) {
-	query := `
-		INSERT INTO post_likes (id, post_id, user_id, created_at)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (post_id, user_id) DO NOTHING
-	`
-
-	id := uuid.New()
-	now := time.Now()
-
-	result, err := r.pool.Exec(ctx, query, id, postID, userID, now)
-	if err != nil {
-		return false, fmt.Errorf("failed to create post like: %w", err)
-	}
-
-	created = result.RowsAffected() > 0
-
-	// 只有实际创建点赞记录时才更新计数
-	if created {
-		updateQuery := `UPDATE posts SET like_count = like_count + 1 WHERE id = $1`
-		_, err = r.pool.Exec(ctx, updateQuery, postID)
-		if err != nil {
-			return false, fmt.Errorf("failed to update like count: %w", err)
-		}
-	}
-
-	return created, nil
-}
-
-// DeleteIfExists 删除点赞记录（返回是否实际删除）
-// 同时原子更新文章的点赞计数
-func (r *PostLikeRepository) DeleteIfExists(ctx context.Context, postID, userID uuid.UUID) (deleted bool, err error) {
-	query := `DELETE FROM post_likes WHERE post_id = $1 AND user_id = $2`
-
-	result, err := r.pool.Exec(ctx, query, postID, userID)
-	if err != nil {
-		return false, fmt.Errorf("failed to delete post like: %w", err)
-	}
-
-	deleted = result.RowsAffected() > 0
-
-	// 只有实际删除点赞记录时才更新计数
-	if deleted {
-		updateQuery := `UPDATE posts SET like_count = like_count - 1 WHERE id = $1 AND like_count > 0`
-		_, err = r.pool.Exec(ctx, updateQuery, postID)
-		if err != nil {
-			return false, fmt.Errorf("failed to update like count: %w", err)
-		}
-	}
-
-	return deleted, nil
-}
-
-// Exists 检查用户是否已点赞文章
-func (r *PostLikeRepository) Exists(ctx context.Context, postID, userID uuid.UUID) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM post_likes WHERE post_id = $1 AND user_id = $2)`
-
-	var exists bool
-	err := r.pool.QueryRow(ctx, query, postID, userID).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("failed to check post like exists: %w", err)
-	}
-	return exists, nil
-}
-
-// CountByPostID 统计文章的点赞数量
+// CountByPostID 统计文章的点赞数量。
+//
+// 这是 CountByTarget 的别名，保持接口兼容。
 func (r *PostLikeRepository) CountByPostID(ctx context.Context, postID uuid.UUID) (int, error) {
-	query := `SELECT COUNT(*) FROM post_likes WHERE post_id = $1`
-
-	var count int
-	err := r.pool.QueryRow(ctx, query, postID).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("failed to count post likes: %w", err)
-	}
-	return count, nil
+	return r.CountByTarget(ctx, postID)
 }
 
-// GetByUserID 获取用户的所有点赞记录
+// GetByUserID 获取用户的所有点赞记录。
+//
+// 此方法返回特定类型的点赞记录，需要在子类中实现。
 func (r *PostLikeRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*post.PostLike, error) {
 	query := `
 		SELECT id, post_id, user_id, created_at
@@ -673,7 +608,6 @@ func (r *PostLikeRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 	}
 	return likes, nil
 }
-
 // CountByAuthor 统计作者的文章数量
 func (r *PostRepository) CountByAuthor(ctx context.Context, authorID uuid.UUID) (int, error) {
 	query := `SELECT COUNT(*) FROM posts WHERE author_id = $1`

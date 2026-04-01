@@ -367,74 +367,46 @@ func (r *CommentRepository) scanComments(rows pgx.Rows) ([]*comment.Comment, err
 	return comments, nil
 }
 
-// CommentLikeRepository 评论点赞仓库实现
+// CommentLikeRepository 评论点赞仓库实现。
+//
+// 包装 BaseLikeRepository 提供评论点赞功能，保持接口兼容。
 type CommentLikeRepository struct {
-	pool *Pool
+	*BaseLikeRepository
 }
 
-// NewCommentLikeRepository 创建评论点赞仓库
+// NewCommentLikeRepository 创建评论点赞仓库。
 func NewCommentLikeRepository(pool *Pool) *CommentLikeRepository {
-	return &CommentLikeRepository{pool: pool}
+	return &CommentLikeRepository{
+		BaseLikeRepository: NewBaseLikeRepository(pool, CommentLikeConfig()),
+	}
 }
 
-// Create 创建点赞记录
+// Create 创建点赞记录（返回完整对象）。
 func (r *CommentLikeRepository) Create(ctx context.Context, commentID, userID uuid.UUID) (*comment.CommentLike, error) {
-	query := `
-		INSERT INTO comment_likes (id, comment_id, user_id, created_at)
-		VALUES ($1, $2, $3, $4)
-	`
-
-	id := uuid.New()
-	now := time.Now()
-
-	_, err := r.pool.Exec(ctx, query, id, commentID, userID, now)
+	created, err := r.CreateIfNotExists(ctx, commentID, userID)
 	if err != nil {
-		if isUniqueViolation(err, "comment_likes_comment_id_user_id_key") {
-			return nil, comment.ErrAlreadyLiked
-		}
-		return nil, fmt.Errorf("failed to create comment like: %w", err)
+		return nil, err
+	}
+	if !created {
+		return nil, comment.ErrAlreadyLiked
 	}
 
 	return &comment.CommentLike{
-		ID:        id,
+		ID:        uuid.New(),
 		CommentID: commentID,
 		UserID:    userID,
-		CreatedAt: now,
+		CreatedAt: time.Now(),
 	}, nil
 }
 
-// CreateIfNotExists 创建点赞记录（使用 ON CONFLICT DO NOTHING），返回是否实际创建
-// 同时原子更新评论的点赞计数
-func (r *CommentLikeRepository) CreateIfNotExists(ctx context.Context, commentID, userID uuid.UUID) (created bool, err error) {
-	query := `
-		INSERT INTO comment_likes (id, comment_id, user_id, created_at)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (comment_id, user_id) DO NOTHING
-	`
-
-	id := uuid.New()
-	now := time.Now()
-
-	result, err := r.pool.Exec(ctx, query, id, commentID, userID, now)
-	if err != nil {
-		return false, fmt.Errorf("failed to create comment like: %w", err)
-	}
-
-	created = result.RowsAffected() > 0
-
-	// 只有实际创建点赞记录时才更新计数
-	if created {
-		updateQuery := `UPDATE comments SET like_count = like_count + 1 WHERE id = $1`
-		_, err = r.pool.Exec(ctx, updateQuery, commentID)
-		if err != nil {
-			return false, fmt.Errorf("failed to update like count: %w", err)
-		}
-	}
-
-	return created, nil
+// CountByCommentID 统计评论的点赞数量。
+//
+// 这是 CountByTarget 的别名，保持接口兼容。
+func (r *CommentLikeRepository) CountByCommentID(ctx context.Context, commentID uuid.UUID) (int, error) {
+	return r.CountByTarget(ctx, commentID)
 }
 
-// GetByCommentAndUser 获取用户对评论的点赞记录
+// GetByCommentAndUser 获取用户对评论的点赞记录。
 func (r *CommentLikeRepository) GetByCommentAndUser(ctx context.Context, commentID, userID uuid.UUID) (*comment.CommentLike, error) {
 	query := `
 		SELECT id, comment_id, user_id, created_at
@@ -457,71 +429,19 @@ func (r *CommentLikeRepository) GetByCommentAndUser(ctx context.Context, comment
 	return l, nil
 }
 
-// Delete 删除点赞记录（取消点赞）
+// Delete 删除点赞记录（取消点赞）。
 func (r *CommentLikeRepository) Delete(ctx context.Context, commentID, userID uuid.UUID) error {
-	query := `DELETE FROM comment_likes WHERE comment_id = $1 AND user_id = $2`
-
-	result, err := r.pool.Exec(ctx, query, commentID, userID)
+	deleted, err := r.DeleteIfExists(ctx, commentID, userID)
 	if err != nil {
-		return fmt.Errorf("failed to delete comment like: %w", err)
+		return err
 	}
-
-	if result.RowsAffected() == 0 {
+	if !deleted {
 		return comment.ErrNotLiked
 	}
-
 	return nil
 }
 
-// DeleteIfExists 删除点赞记录（返回是否实际删除）
-// 同时原子更新评论的点赞计数
-func (r *CommentLikeRepository) DeleteIfExists(ctx context.Context, commentID, userID uuid.UUID) (deleted bool, err error) {
-	query := `DELETE FROM comment_likes WHERE comment_id = $1 AND user_id = $2`
-
-	result, err := r.pool.Exec(ctx, query, commentID, userID)
-	if err != nil {
-		return false, fmt.Errorf("failed to delete comment like: %w", err)
-	}
-
-	deleted = result.RowsAffected() > 0
-
-	// 只有实际删除点赞记录时才更新计数
-	if deleted {
-		updateQuery := `UPDATE comments SET like_count = like_count - 1 WHERE id = $1 AND like_count > 0`
-		_, err = r.pool.Exec(ctx, updateQuery, commentID)
-		if err != nil {
-			return false, fmt.Errorf("failed to update like count: %w", err)
-		}
-	}
-
-	return deleted, nil
-}
-
-// Exists 检查用户是否已点赞评论
-func (r *CommentLikeRepository) Exists(ctx context.Context, commentID, userID uuid.UUID) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM comment_likes WHERE comment_id = $1 AND user_id = $2)`
-
-	var exists bool
-	err := r.pool.QueryRow(ctx, query, commentID, userID).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("failed to check comment like exists: %w", err)
-	}
-	return exists, nil
-}
-
-// CountByCommentID 统计评论的点赞数量
-func (r *CommentLikeRepository) CountByCommentID(ctx context.Context, commentID uuid.UUID) (int, error) {
-	query := `SELECT COUNT(*) FROM comment_likes WHERE comment_id = $1`
-
-	var count int
-	err := r.pool.QueryRow(ctx, query, commentID).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("failed to count comment likes: %w", err)
-	}
-	return count, nil
-}
-
-// GetByUserID 获取用户的所有点赞记录
+// GetByUserID 获取用户的所有点赞记录。
 func (r *CommentLikeRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*comment.CommentLike, error) {
 	query := `
 		SELECT id, comment_id, user_id, created_at
@@ -551,8 +471,9 @@ func (r *CommentLikeRepository) GetByUserID(ctx context.Context, userID uuid.UUI
 	return likes, nil
 }
 
-// GetLikesBatch 批量检查用户对多个评论的点赞状态
-// 返回一个 map，key 是 commentID，value 是是否已点赞
+// GetLikesBatch 批量检查用户对多个评论的点赞状态。
+//
+// 返回一个 map，key 是 commentID，value 是是否已点赞。
 func (r *CommentLikeRepository) GetLikesBatch(ctx context.Context, commentIDs []uuid.UUID, userID uuid.UUID) (map[uuid.UUID]bool, error) {
 	if len(commentIDs) == 0 || userID == uuid.Nil {
 		return make(map[uuid.UUID]bool), nil

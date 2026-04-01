@@ -74,7 +74,7 @@ func (r *CategoryRepository) Create(ctx context.Context, category *post.Category
 	)
 
 	if err != nil {
-		if isUniqueViolation(err, "categories_slug_key") {
+		if IsUniqueViolation(err, "categories_slug_key") {
 			return fmt.Errorf("分类 slug 已存在: %s", category.Slug)
 		}
 		return fmt.Errorf("failed to create category: %w", err)
@@ -102,7 +102,7 @@ func (r *CategoryRepository) Update(ctx context.Context, category *post.Category
 	)
 
 	if err != nil {
-		if isUniqueViolation(err, "categories_slug_key") {
+		if IsUniqueViolation(err, "categories_slug_key") {
 			return fmt.Errorf("分类 slug 已存在: %s", category.Slug)
 		}
 		return fmt.Errorf("failed to update category: %w", err)

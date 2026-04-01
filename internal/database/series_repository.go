@@ -73,7 +73,7 @@ func (r *SeriesRepository) Create(ctx context.Context, series *post.Series) erro
 	)
 
 	if err != nil {
-		if isUniqueViolation(err, "series_slug_key") {
+		if IsUniqueViolation(err, "series_slug_key") {
 			return post.ErrSeriesNotFound // slug 已存在，使用适当的错误
 		}
 		return fmt.Errorf("failed to create series: %w", err)
@@ -98,7 +98,7 @@ func (r *SeriesRepository) Update(ctx context.Context, series *post.Series) erro
 	)
 
 	if err != nil {
-		if isUniqueViolation(err, "series_slug_key") {
+		if IsUniqueViolation(err, "series_slug_key") {
 			return post.ErrSeriesNotFound
 		}
 		return fmt.Errorf("failed to update series: %w", err)

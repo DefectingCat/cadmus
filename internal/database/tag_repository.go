@@ -68,10 +68,10 @@ func (r *TagRepository) Create(ctx context.Context, tag *post.Tag) error {
 
 	if err != nil {
 		// 检查唯一约束冲突
-		if isUniqueViolation(err, "tags_name_key") {
+		if IsUniqueViolation(err, "tags_name_key") {
 			return fmt.Errorf("tag name already exists: %w", post.ErrTagNotFound)
 		}
-		if isUniqueViolation(err, "tags_slug_key") {
+		if IsUniqueViolation(err, "tags_slug_key") {
 			return fmt.Errorf("tag slug already exists: %w", post.ErrTagNotFound)
 		}
 		return fmt.Errorf("failed to create tag: %w", err)
@@ -183,7 +183,7 @@ func (r *TagRepository) AddPostTag(ctx context.Context, postID, tagID uuid.UUID)
 	_, err := r.pool.Exec(ctx, query, postID, tagID)
 	if err != nil {
 		// UNIQUE 约束冲突表示关联已存在，忽略即可
-		if isUniqueViolation(err, "post_tags_pkey") {
+		if IsUniqueViolation(err, "post_tags_pkey") {
 			return nil // 关联已存在，不视为错误
 		}
 		return fmt.Errorf("failed to add post tag: %w", err)

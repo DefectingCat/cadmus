@@ -26,7 +26,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"rua.plus/cadmus/internal/core/user"
 )
 
@@ -78,10 +77,10 @@ func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 
 	if err != nil {
 		// 检查唯一约束冲突
-		if isUniqueViolation(err, "users_username_key") {
+		if IsUniqueViolation(err, "users_username_key") {
 			return user.ErrUserAlreadyExists
 		}
-		if isUniqueViolation(err, "users_email_key") {
+		if IsUniqueViolation(err, "users_email_key") {
 			return user.ErrUserAlreadyExists
 		}
 		return fmt.Errorf("failed to create user: %w", err)
@@ -162,7 +161,7 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 	)
 
 	if err != nil {
-		if isUniqueViolation(err, "users_username_key") || isUniqueViolation(err, "users_email_key") {
+		if IsUniqueViolation(err, "users_username_key") || IsUniqueViolation(err, "users_email_key") {
 			return user.ErrUserAlreadyExists
 		}
 		return fmt.Errorf("failed to update user: %w", err)
@@ -264,13 +263,4 @@ func (r *UserRepository) scanUserFromRow(row pgx.Rows) (*user.User, error) {
 		return nil, err
 	}
 	return u, nil
-}
-
-// isUniqueViolation 检查是否为指定约束的唯一性冲突错误
-func isUniqueViolation(err error, constraintName string) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505" && pgErr.ConstraintName == constraintName
-	}
-	return false
 }
