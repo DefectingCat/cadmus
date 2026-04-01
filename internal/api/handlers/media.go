@@ -1,3 +1,20 @@
+// Package handlers 提供了 Cadmus API 的 HTTP 处理器实现。
+//
+// 该文件包含媒体文件相关的核心逻辑，包括：
+//   - 文件上传和存储
+//   - 媒体文件管理（列表、删除）
+//   - 图片尺寸信息处理
+//
+// 主要用途：
+//
+//	用于处理用户上传的媒体文件管理，支持图片、视频等多种格式。
+//
+// 注意事项：
+//   - 上传需要用户认证
+//   - 有文件大小和类型限制
+//   - 只能删除自己上传的文件
+//
+// 作者：xfy
 package handlers
 
 import (
@@ -9,39 +26,91 @@ import (
 	"rua.plus/cadmus/internal/services"
 )
 
-// MediaHandler 媒体 API 处理器
+// MediaHandler 媒体 API 处理器。
+//
+// 该处理器负责处理所有媒体文件相关的 HTTP 请求，包括文件上传、
+// 列表查询和删除操作。
 type MediaHandler struct {
+	// mediaService 媒体服务，处理媒体业务逻辑
 	mediaService services.MediaService
 }
 
-// NewMediaHandler 创建媒体处理器
+// NewMediaHandler 创建媒体处理器。
+//
+// 参数：
+//   - mediaService: 媒体服务，处理媒体业务逻辑
+//
+// 返回值：
+//   - *MediaHandler: 新创建的媒体处理器实例
 func NewMediaHandler(mediaService services.MediaService) *MediaHandler {
 	return &MediaHandler{mediaService: mediaService}
 }
 
-// MediaResponse 媒体响应
+// MediaResponse 媒体响应结构体。
 type MediaResponse struct {
-	ID           uuid.UUID `json:"id"`
-	UploaderID   uuid.UUID `json:"uploader_id"`
-	Filename     string    `json:"filename"`
-	OriginalName string    `json:"original_name"`
-	URL          string    `json:"url"`
-	MimeType     string    `json:"mime_type"`
-	Size         int64     `json:"size"`
-	Width        *int      `json:"width,omitempty"`
-	Height       *int      `json:"height,omitempty"`
-	AltText      *string   `json:"alt_text,omitempty"`
-	CreatedAt    string    `json:"created_at"`
+	// ID 媒体唯一标识符
+	ID uuid.UUID `json:"id"`
+
+	// UploaderID 上传者 ID
+	UploaderID uuid.UUID `json:"uploader_id"`
+
+	// Filename 存储文件名
+	Filename string `json:"filename"`
+
+	// OriginalName 原始文件名
+	OriginalName string `json:"original_name"`
+
+	// URL 访问 URL
+	URL string `json:"url"`
+
+	// MimeType MIME 类型
+	MimeType string `json:"mime_type"`
+
+	// Size 文件大小（字节）
+	Size int64 `json:"size"`
+
+	// Width 图片宽度（可选）
+	Width *int `json:"width,omitempty"`
+
+	// Height 图片高度（可选）
+	Height *int `json:"height,omitempty"`
+
+	// AltText 替代文本（可选）
+	AltText *string `json:"alt_text,omitempty"`
+
+	// CreatedAt 创建时间
+	CreatedAt string `json:"created_at"`
 }
 
-// MediaListResponse 媒体列表响应
+// MediaListResponse 媒体列表响应结构体。
 type MediaListResponse struct {
+	// Medias 媒体列表
 	Medias []MediaResponse `json:"media"`
-	Total  int             `json:"total"`
+
+	// Total 总数
+	Total int `json:"total"`
 }
 
-// Upload 上传文件
-// POST /api/v1/media/upload
+// Upload 上传文件。
+//
+// 处理文件上传请求，支持图片、视频等多种格式。
+// 最大文件大小为 10MB。需要用户认证。
+//
+// 路由：POST /api/v1/media/upload
+//
+// 参数：
+//   - file: 上传的文件（multipart form）
+//   - alt_text: 替代文本（可选）
+//
+// 返回值（通过响应体）：
+//   - 新创建的媒体信息
+//
+// 可能的错误：
+//   - UNAUTHORIZED: 未登录
+//   - BAD_REQUEST: 无法解析表单或未找到文件
+//   - FILE_TOO_LARGE: 文件大小超过限制
+//   - INVALID_FILE_TYPE: 不支持的文件类型
+//   - INTERNAL_ERROR: 上传失败
 func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -91,8 +160,21 @@ func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, toMediaResponse(m), http.StatusCreated)
 }
 
-// Delete 删除文件
-// DELETE /api/v1/media/{id}
+// Delete 删除文件。
+//
+// 删除指定的媒体文件。需要用户认证且只能删除自己上传的文件。
+//
+// 路由：DELETE /api/v1/media/{id}
+//
+// 参数：
+//   - id: 媒体 ID（路径参数）
+//
+// 可能的错误：
+//   - UNAUTHORIZED: 未登录
+//   - BAD_REQUEST: 无效的媒体 ID
+//   - NOT_FOUND: 媒体文件不存在
+//   - PERMISSION_DENIED: 只能删除自己上传的文件
+//   - INTERNAL_ERROR: 删除失败
 func (h *MediaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
@@ -126,8 +208,22 @@ func (h *MediaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// List 获取媒体列表
-// GET /api/v1/media
+// List 获取媒体列表。
+//
+// 获取媒体文件列表，支持分页和筛选。
+// 可以筛选当前用户上传的文件。
+//
+// 路由：GET /api/v1/media
+//
+// 查询参数：
+//   - offset: 偏移量，默认 0
+//   - limit: 数量限制，默认 20，最大 100
+//   - mine: 是否只获取当前用户的文件（true/false）
+//   - type: MIME 类型筛选
+//
+// 返回值（通过响应体）：
+//   - media: 媒体列表
+//   - total: 总数
 func (h *MediaHandler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -174,8 +270,22 @@ func (h *MediaHandler) List(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
-// Get 获取单个媒体信息
-// GET /api/v1/media/{id}
+// Get 获取单个媒体信息。
+//
+// 根据媒体 ID 获取详细信息。
+//
+// 路由：GET /api/v1/media/{id}
+//
+// 参数：
+//   - id: 媒体 ID（路径参数）
+//
+// 返回值（通过响应体）：
+//   - 媒体详细信息
+//
+// 可能的错误：
+//   - BAD_REQUEST: 无效的媒体 ID
+//   - NOT_FOUND: 媒体文件不存在
+//   - INTERNAL_ERROR: 获取失败
 func (h *MediaHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
@@ -199,7 +309,13 @@ func (h *MediaHandler) Get(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, toMediaResponse(m), http.StatusOK)
 }
 
-// toMediaResponse 转换媒体为响应格式
+// toMediaResponse 转换 Media 实体到 MediaResponse 响应结构。
+//
+// 参数：
+//   - m: Media 实体指针
+//
+// 返回值：
+//   - MediaResponse: 媒体响应结构
 func toMediaResponse(m *media.Media) MediaResponse {
 	return MediaResponse{
 		ID:           m.ID,
@@ -216,7 +332,17 @@ func toMediaResponse(m *media.Media) MediaResponse {
 	}
 }
 
-// parseInt 解析整数
+// parseInt 解析整数字符串。
+//
+// 将字符串转换为整数，支持负数。
+// 不使用 strconv.Atoi 以避免导入额外包。
+//
+// 参数：
+//   - s: 要解析的字符串
+//
+// 返回值：
+//   - int: 解析结果
+//   - error: 解析失败时的错误
 func parseInt(s string) (int, error) {
 	var n int
 	var negative bool

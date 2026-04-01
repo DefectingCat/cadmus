@@ -1,3 +1,20 @@
+// Package handlers 提供了 Cadmus API 的 HTTP 处理器实现。
+//
+// 该文件包含 HTTP 中间件相关的核心逻辑，包括：
+//   - JWT 认证中间件
+//   - 权限检查中间件
+//   - API 错误响应处理
+//   - Context 工具函数
+//
+// 主要用途：
+//
+//	提供 HTTP 请求的认证、授权和错误处理功能。
+//
+// 注意事项：
+//   - 中间件链顺序：RateLimit -> Auth -> Permission -> Handler
+//   - 所有认证信息通过 context 传递
+//
+// 作者：xfy
 package handlers
 
 import (
@@ -12,15 +29,32 @@ import (
 	"rua.plus/cadmus/internal/core/user"
 )
 
-// ctxKey 类型安全的 context key
+// ctxKey 类型安全的 context key。
+//
+// 使用自定义类型避免 context key 冲突。
 type ctxKey string
 
 const (
-	ctxUserID   ctxKey = "user_id"
+	// ctxUserID 用户 ID 的 context key
+	ctxUserID ctxKey = "user_id"
+
+	// ctxUserRole 用户角色 ID 的 context key
 	ctxUserRole ctxKey = "user_role_id"
 )
 
-// AuthMiddleware JWT 认证中间件
+// AuthMiddleware JWT 认证中间件。
+//
+// 验证请求中的 JWT 令牌，并将用户 ID 和角色 ID 注入到 context 中。
+// 如果令牌无效或缺失，返回 401 错误。
+//
+// 参数：
+//   - jwtService: JWT 服务，用于令牌验证
+//
+// 返回值：
+//   - 中间件函数
+//
+// 使用示例：
+//   router.Use(AuthMiddleware(jwtService))
 func AuthMiddleware(jwtService *auth.JWTService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +78,17 @@ func AuthMiddleware(jwtService *auth.JWTService) func(http.Handler) http.Handler
 	}
 }
 
-// AuthMiddlewareWithBlacklist JWT 认证中间件（带黑名单检查）
+// AuthMiddlewareWithBlacklist JWT 认证中间件（带黑名单检查）。
+//
+// 验证请求中的 JWT 令牌，并检查令牌是否已被撤销（在黑名单中）。
+// 适用于需要即时令牌撤销的场景，如用户登出。
+//
+// 参数：
+//   - jwtService: JWT 服务
+//   - blacklist: 令牌黑名单服务
+//
+// 返回值：
+//   - 中间件函数
 func AuthMiddlewareWithBlacklist(jwtService *auth.JWTService, blacklist auth.TokenBlacklist) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +120,17 @@ func AuthMiddlewareWithBlacklist(jwtService *auth.JWTService, blacklist auth.Tok
 	}
 }
 
-// GetUserID 从 context 获取用户 ID
+// GetUserID 从 context 获取用户 ID。
+//
+// 从请求 context 中提取认证用户的 ID。
+// 必须在 AuthMiddleware 之后调用。
+//
+// 参数：
+//   - ctx: 请求 context
+//
+// 返回值：
+//   - uuid.UUID: 用户 ID
+//   - error: 用户未认证时返回错误
 func GetUserID(ctx context.Context) (uuid.UUID, error) {
 	id, ok := ctx.Value(ctxUserID).(uuid.UUID)
 	if !ok {
@@ -85,7 +139,17 @@ func GetUserID(ctx context.Context) (uuid.UUID, error) {
 	return id, nil
 }
 
-// GetUserRoleID 从 context 获取用户角色 ID
+// GetUserRoleID 从 context 获取用户角色 ID。
+//
+// 从请求 context 中提取用户的角色 ID。
+// 必须在 AuthMiddleware 之后调用。
+//
+// 参数：
+//   - ctx: 请求 context
+//
+// 返回值：
+//   - uuid.UUID: 角色ID
+//   - error: 角色信息未找到时返回错误
 func GetUserRoleID(ctx context.Context) (uuid.UUID, error) {
 	id, ok := ctx.Value(ctxUserRole).(uuid.UUID)
 	if !ok {

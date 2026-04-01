@@ -1,3 +1,22 @@
+// Package handlers 提供了 Cadmus API 的 HTTP 处理器实现。
+//
+// 该文件包含评论相关的核心逻辑，包括：
+//   - 评论和回复的 CRUD 操作
+//   - 评论树形结构处理
+//   - 评论点赞功能
+//   - 评论审核管理
+//   - 评论通知发送
+//
+// 主要用途：
+//
+//	用于处理文章评论的完整生命周期管理，支持嵌套回复和审核流程。
+//
+// 注意事项：
+//   - 发表评论需要用户认证
+//   - 评论支持多级嵌套，但有深度限制
+//   - 管理员可以审核、批准或拒绝评论
+//
+// 作者：xfy
 package handlers
 
 import (
@@ -11,20 +30,54 @@ import (
 	"rua.plus/cadmus/internal/services"
 )
 
-// CommentHandler 评论 API 处理器
+// CommentHandler 评论 API 处理器。
+//
+// 该处理器负责处理所有评论相关的 HTTP 请求，包括评论的增删改查、
+// 点赞功能和审核管理。支持树形结构的嵌套评论。
+//
+// 注意事项：
+//   - 需要注入 CommentService 处理业务逻辑
+//   - 可选注入 NotificationService 实现评论通知
 type CommentHandler struct {
-	commentService     services.CommentService
+	// commentService 评论服务，处理评论业务逻辑
+	commentService services.CommentService
+
+	// notificationService 通知服务，发送评论通知（可选）
 	notificationService services.NotificationService
-	postService        services.PostService
-	userService        services.UserService
+
+	// postService 文章服务，用于通知时获取文章信息
+	postService services.PostService
+
+	// userService 用户服务，用于通知时获取用户信息
+	userService services.UserService
 }
 
-// NewCommentHandler 创建评论处理器
+// NewCommentHandler 创建评论处理器。
+//
+// 创建一个基础的评论处理器，不支持通知功能。
+//
+// 参数：
+//   - commentService: 评论服务，处理评论业务逻辑
+//
+// 返回值：
+//   - *CommentHandler: 新创建的评论处理器实例
 func NewCommentHandler(commentService services.CommentService) *CommentHandler {
 	return &CommentHandler{commentService: commentService}
 }
 
-// NewCommentHandlerWithNotifications 创建带通知功能的评论处理器
+// NewCommentHandlerWithNotifications 创建带通知功能的评论处理器。
+//
+// 创建一个完整的评论处理器，支持评论通知功能。
+// 当用户发表评论或回复时，会异步发送通知给文章作者或被回复用户。
+//
+// 参数：
+//   - commentService: 评论服务
+//   - notificationService: 通知服务
+//   - postService: 文章服务，用于获取文章信息
+//   - userService: 用户服务，用于获取用户信息
+//
+// 返回值：
+//   - *CommentHandler: 新创建的完整功能评论处理器实例
 func NewCommentHandlerWithNotifications(
 	commentService services.CommentService,
 	notificationService services.NotificationService,
@@ -39,47 +92,93 @@ func NewCommentHandlerWithNotifications(
 	}
 }
 
-// CreateCommentRequest 创建评论请求
+// CreateCommentRequest 创建评论请求结构体。
 type CreateCommentRequest struct {
-	PostID   uuid.UUID  `json:"post_id"`
-	ParentID *uuid.UUID `json:"parent_id,omitempty"`
-	Content  string     `json:"content"`
-}
+	// PostID 文章 ID，必填
+	PostID uuid.UUID `json:"post_id"`
 
-// UpdateCommentRequest 更新评论请求
-type UpdateCommentRequest struct {
+	// ParentID 父评论 ID，回复时填写（可选）
+	ParentID *uuid.UUID `json:"parent_id,omitempty"`
+
+	// Content 评论内容，必填
 	Content string `json:"content"`
 }
 
-// CommentResponse 评论响应
+// UpdateCommentRequest 更新评论请求结构体。
+type UpdateCommentRequest struct {
+	// Content 新的评论内容
+	Content string `json:"content"`
+}
+
+// CommentResponse 评论响应结构体。
 type CommentResponse struct {
-	ID        uuid.UUID          `json:"id"`
-	PostID    uuid.UUID          `json:"post_id"`
-	UserID    uuid.UUID          `json:"user_id"`
-	ParentID  *uuid.UUID         `json:"parent_id,omitempty"`
-	Depth     int                `json:"depth"`
-	Content   string             `json:"content"`
-	Status    string             `json:"status"`
-	LikeCount int                `json:"like_count"`
-	CreatedAt string             `json:"created_at"`
-	UpdatedAt string             `json:"updated_at"`
+	// ID 评论唯一标识符
+	ID uuid.UUID `json:"id"`
+
+	// PostID 所属文章 ID
+	PostID uuid.UUID `json:"post_id"`
+
+	// UserID 评论者 ID
+	UserID uuid.UUID `json:"user_id"`
+
+	// ParentID 父评论 ID（顶层评论为 nil）
+	ParentID *uuid.UUID `json:"parent_id,omitempty"`
+
+	// Depth 嵌套深度，顶层评论为 0
+	Depth int `json:"depth"`
+
+	// Content 评论内容
+	Content string `json:"content"`
+
+	// Status 评论状态
+	Status string `json:"status"`
+
+	// LikeCount 点赞数
+	LikeCount int `json:"like_count"`
+
+	// CreatedAt 创建时间
+	CreatedAt string `json:"created_at"`
+
+	// UpdatedAt 更新时间
+	UpdatedAt string `json:"updated_at"`
 }
 
-// CommentNodeResponse 评论树节点响应
+// CommentNodeResponse 评论树节点响应结构体。
+//
+// 用于返回树形结构的评论数据，包含子评论列表。
 type CommentNodeResponse struct {
-	Comment  CommentResponse      `json:"comment"`
+	// Comment 评论内容
+	Comment CommentResponse `json:"comment"`
+
+	// Children 子评论列表
 	Children []*CommentNodeResponse `json:"children,omitempty"`
-	IsLiked  bool                 `json:"is_liked,omitempty"`
+
+	// IsLiked 当前用户是否已点赞
+	IsLiked bool `json:"is_liked,omitempty"`
 }
 
-// CommentListResponse 评论列表响应
+// CommentListResponse 评论列表响应结构体。
 type CommentListResponse struct {
+	// Comments 评论树列表
 	Comments []*CommentNodeResponse `json:"comments"`
-	Total    int                    `json:"total"`
+
+	// Total 评论总数
+	Total int `json:"total"`
 }
 
-// GetByPost 获取文章评论列表（树形结构）
-// GET /api/v1/comments/post/{postId}
+// GetByPost 获取文章评论列表（树形结构）。
+//
+// 获取指定文章的所有评论，以树形结构返回。
+// 支持显示当前用户的点赞状态。
+//
+// 路由：GET /api/v1/comments/post/{postId}
+//
+// 参数：
+//   - postId: 文章 ID（路径参数）
+//
+// 返回值（通过响应体）：
+//   - comments: 评论树列表
+//   - total: 评论总数
 func (h *CommentHandler) GetByPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	postIDStr := r.PathValue("postId")
@@ -121,8 +220,28 @@ func (h *CommentHandler) GetByPost(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
-// Create 发表评论
-// POST /api/v1/comments
+// Create 发表评论。
+//
+// 发表新评论或回复。需要用户认证。
+// 支持多级嵌套回复，但有深度限制。
+// 发表成功后会异步发送通知。
+//
+// 路由：POST /api/v1/comments
+//
+// 参数（通过请求体）：
+//   - post_id: 文章 ID（必填）
+//   - parent_id: 父评论 ID（回复时必填）
+//   - content: 评论内容（必填）
+//
+// 返回值（通过响应体）：
+//   - 新创建的评论信息
+//
+// 可能的错误：
+//   - UNAUTHORIZED: 未登录
+//   - BAD_REQUEST: 请求格式错误或缺少必填字段
+//   - VALIDATION_ERROR: 评论嵌套深度超过限制
+//   - NOT_FOUND: 文章或父评论不存在
+//   - INTERNAL_ERROR: 创建失败
 func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -180,8 +299,25 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, toCommentResponse(c), http.StatusCreated)
 }
 
-// Update 编辑评论
-// PUT /api/v1/comments/{id}
+// Update 编辑评论。
+//
+// 编辑已有的评论内容。需要用户认证且只能编辑自己的评论。
+//
+// 路由：PUT /api/v1/comments/{id}
+//
+// 参数：
+//   - id: 评论 ID（路径参数）
+//   - content: 新的评论内容（请求体）
+//
+// 返回值（通过响应体）：
+//   - 更新后的评论信息
+//
+// 可能的错误：
+//   - UNAUTHORIZED: 未登录
+//   - BAD_REQUEST: 无效的评论 ID 或请求格式
+//   - NOT_FOUND: 评论不存在
+//   - PERMISSION_DENIED: 只能编辑自己的评论
+//   - INTERNAL_ERROR: 更新失败
 func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
@@ -233,8 +369,21 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, toCommentResponse(c), http.StatusOK)
 }
 
-// Delete 删除评论
-// DELETE /api/v1/comments/{id}
+// Delete 删除评论。
+//
+// 删除指定的评论。需要用户认证且只能删除自己的评论。
+//
+// 路由：DELETE /api/v1/comments/{id}
+//
+// 参数：
+//   - id: 评论 ID（路径参数）
+//
+// 可能的错误：
+//   - UNAUTHORIZED: 未登录
+//   - BAD_REQUEST: 无效的评论 ID
+//   - NOT_FOUND: 评论不存在
+//   - PERMISSION_DENIED: 只能删除自己的评论
+//   - INTERNAL_ERROR: 删除失败
 func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
@@ -268,8 +417,25 @@ func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Like 点赞评论
-// POST /api/v1/comments/{id}/like
+// Like 点赞评论。
+//
+// 为指定评论点赞。需要用户认证。
+// 每个用户只能对同一评论点赞一次。
+//
+// 路由：POST /api/v1/comments/{id}/like
+//
+// 参数：
+//   - id: 评论 ID（路径参数）
+//
+// 返回值（通过响应体）：
+//   - message: 点赞成功提示
+//
+// 可能的错误：
+//   - UNAUTHORIZED: 未登录
+//   - BAD_REQUEST: 无效的评论 ID
+//   - NOT_FOUND: 评论不存在
+//   - ALREADY_LIKED: 已点赞该评论
+//   - INTERNAL_ERROR: 点赞失败
 func (h *CommentHandler) Like(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
@@ -303,8 +469,24 @@ func (h *CommentHandler) Like(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "点赞成功"}, http.StatusOK)
 }
 
-// Unlike 取消点赞
-// DELETE /api/v1/comments/{id}/like
+// Unlike 取消点赞。
+//
+// 取消对评论的点赞。需要用户认证。
+//
+// 路由：DELETE /api/v1/comments/{id}/like
+//
+// 参数：
+//   - id: 评论 ID（路径参数）
+//
+// 返回值（通过响应体）：
+//   - message: 取消点赞成功提示
+//
+// 可能的错误：
+//   - UNAUTHORIZED: 未登录
+//   - BAD_REQUEST: 无效的评论 ID
+//   - NOT_FOUND: 评论不存在
+//   - NOT_LIKED: 未点赞该评论
+//   - INTERNAL_ERROR: 取消点赞失败
 func (h *CommentHandler) Unlike(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
@@ -338,8 +520,22 @@ func (h *CommentHandler) Unlike(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "取消点赞成功"}, http.StatusOK)
 }
 
-// Approve 审核批准评论（需权限）
-// PUT /api/v1/comments/{id}/approve
+// Approve 审核批准评论（需权限）。
+//
+// 批准待审核的评论，使其公开可见。需要管理员权限。
+//
+// 路由：PUT /api/v1/comments/{id}/approve
+//
+// 参数：
+//   - id: 评论 ID（路径参数）
+//
+// 返回值（通过响应体）：
+//   - message: 批准成功提示
+//
+// 可能的错误：
+//   - BAD_REQUEST: 无效的评论 ID
+//   - NOT_FOUND: 评论不存在
+//   - INTERNAL_ERROR: 审核失败
 func (h *CommentHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
@@ -362,8 +558,22 @@ func (h *CommentHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "评论已批准"}, http.StatusOK)
 }
 
-// Reject 审核拒绝评论（需权限）
-// PUT /api/v1/comments/{id}/reject
+// Reject 审核拒绝评论（需权限）。
+//
+// 拒绝待审核的评论，使其不可见。需要管理员权限。
+//
+// 路由：PUT /api/v1/comments/{id}/reject
+//
+// 参数：
+//   - id: 评论 ID（路径参数）
+//
+// 返回值（通过响应体）：
+//   - message: 拒绝成功提示
+//
+// 可能的错误：
+//   - BAD_REQUEST: 无效的评论 ID
+//   - NOT_FOUND: 评论不存在
+//   - INTERNAL_ERROR: 审核失败
 func (h *CommentHandler) Reject(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
@@ -386,8 +596,23 @@ func (h *CommentHandler) Reject(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "评论已拒绝"}, http.StatusOK)
 }
 
-// AdminListComments 获取评论列表（管理员）
-// GET /api/v1/admin/comments
+// AdminListComments 获取评论列表（管理员）。
+//
+// 获取所有评论的列表，支持按状态筛选和分页。
+// 需要管理员权限。
+//
+// 路由：GET /api/v1/admin/comments
+//
+// 查询参数：
+//   - status: 评论状态筛选，默认为 pending
+//   - page: 页码，默认 1
+//   - per_page: 每页数量，默认 20，最大 100
+//
+// 返回值（通过响应体）：
+//   - comments: 评论列表
+//   - total: 总数
+//   - page: 当前页码
+//   - per_page: 每页数量
 func (h *CommentHandler) AdminListComments(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -443,13 +668,28 @@ func (h *CommentHandler) AdminListComments(w http.ResponseWriter, r *http.Reques
 	}, http.StatusOK)
 }
 
-// BatchApproveRequest 批量审核请求
+// BatchApproveRequest 批量操作请求结构体。
 type BatchApproveRequest struct {
+	// IDs 评论 ID 列表
 	IDs []string `json:"ids"`
 }
 
-// BatchApprove 批量批准评论
-// PUT /api/v1/admin/comments/batch-approve
+// BatchApprove 批量批准评论。
+//
+// 批量批准多条待审核的评论。需要管理员权限。
+//
+// 路由：PUT /api/v1/admin/comments/batch-approve
+//
+// 参数（通过请求体）：
+//   - ids: 评论 ID 列表
+//
+// 返回值（通过响应体）：
+//   - message: 批量审核成功提示
+//
+// 可能的错误：
+//   - BAD_REQUEST: 请求格式错误或无效的评论 ID
+//   - VALIDATION_ERROR: 未选择要审核的评论
+//   - INTERNAL_ERROR: 批量审核失败
 func (h *CommentHandler) BatchApprove(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -482,8 +722,22 @@ func (h *CommentHandler) BatchApprove(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "批量审核成功"}, http.StatusOK)
 }
 
-// BatchReject 批量拒绝评论
-// PUT /api/v1/admin/comments/batch-reject
+// BatchReject 批量拒绝评论。
+//
+// 批量拒绝多条待审核的评论。需要管理员权限。
+//
+// 路由：PUT /api/v1/admin/comments/batch-reject
+//
+// 参数（通过请求体）：
+//   - ids: 评论 ID 列表
+//
+// 返回值（通过响应体）：
+//   - message: 批量拒绝成功提示
+//
+// 可能的错误：
+//   - BAD_REQUEST: 请求格式错误或无效的评论 ID
+//   - VALIDATION_ERROR: 未选择要审核的评论
+//   - INTERNAL_ERROR: 批量拒绝失败
 func (h *CommentHandler) BatchReject(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -516,8 +770,22 @@ func (h *CommentHandler) BatchReject(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "批量拒绝成功"}, http.StatusOK)
 }
 
-// BatchDelete 批量删除评论
-// DELETE /api/v1/admin/comments/batch-delete
+// BatchDelete 批量删除评论。
+//
+// 批量删除多条评论。需要管理员权限。
+//
+// 路由：DELETE /api/v1/admin/comments/batch-delete
+//
+// 参数（通过请求体）：
+//   - ids: 评论 ID 列表
+//
+// 返回值（通过响应体）：
+//   - message: 批量删除成功提示
+//
+// 可能的错误：
+//   - BAD_REQUEST: 请求格式错误或无效的评论 ID
+//   - VALIDATION_ERROR: 未选择要删除的评论
+//   - INTERNAL_ERROR: 批量删除失败
 func (h *CommentHandler) BatchDelete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -550,8 +818,19 @@ func (h *CommentHandler) BatchDelete(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "批量删除成功"}, http.StatusOK)
 }
 
-// AdminDeleteComment 管理员删除单条评论
-// DELETE /api/v1/admin/comments/{id}
+// AdminDeleteComment 管理员删除单条评论。
+//
+// 管理员删除指定的评论，无需是评论作者。
+//
+// 路由：DELETE /api/v1/admin/comments/{id}
+//
+// 参数：
+//   - id: 评论 ID（路径参数）
+//
+// 可能的错误：
+//   - BAD_REQUEST: 无效的评论 ID
+//   - NOT_FOUND: 评论不存在
+//   - INTERNAL_ERROR: 删除失败
 func (h *CommentHandler) AdminDeleteComment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
@@ -574,15 +853,30 @@ func (h *CommentHandler) AdminDeleteComment(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// AdminCommentListResponse 管理员评论列表响应
+// AdminCommentListResponse 管理员评论列表响应结构体。
 type AdminCommentListResponse struct {
+	// Comments 评论列表
 	Comments []CommentResponse `json:"comments"`
-	Total    int               `json:"total"`
-	Page     int               `json:"page"`
-	PerPage  int               `json:"per_page"`
+
+	// Total 评论总数
+	Total int `json:"total"`
+
+	// Page 当前页码
+	Page int `json:"page"`
+
+	// PerPage 每页数量
+	PerPage int `json:"per_page"`
 }
 
-// toCommentResponse 转换评论为响应格式
+// toCommentResponse 转换 Comment 实体到 CommentResponse 响应结构。
+//
+// 将内部的 Comment 实体转换为对外暴露的 CommentResponse 结构。
+//
+// 参数：
+//   - c: Comment 实体指针
+//
+// 返回值：
+//   - CommentResponse: 评论响应结构
 func toCommentResponse(c *comment.Comment) CommentResponse {
 	return CommentResponse{
 		ID:        c.ID,
@@ -598,7 +892,15 @@ func toCommentResponse(c *comment.Comment) CommentResponse {
 	}
 }
 
-// toCommentNodeCommentResponse 转换 CommentNode 中的评论为响应格式（不含 isLiked）
+// toCommentNodeCommentResponse 转换 CommentNode 中的评论为响应格式。
+//
+// 用于树形结构中转换单个评论节点，不包含点赞状态。
+//
+// 参数：
+//   - c: Comment 实体指针
+//
+// 返回值：
+//   - CommentResponse: 评论响应结构
 func toCommentNodeCommentResponse(c *comment.Comment) CommentResponse {
 	return CommentResponse{
 		ID:        c.ID,
@@ -614,7 +916,15 @@ func toCommentNodeCommentResponse(c *comment.Comment) CommentResponse {
 	}
 }
 
-// collectCommentIDs 从评论树中收集所有评论 ID
+// collectCommentIDs 从评论树中收集所有评论 ID。
+//
+// 递归遍历评论树，收集所有评论的 ID，用于批量查询点赞状态。
+//
+// 参数：
+//   - nodes: 评论树节点列表
+//
+// 返回值：
+//   - []uuid.UUID: 所有评论 ID 列表
 func collectCommentIDs(nodes []*services.CommentNode) []uuid.UUID {
 	ids := make([]uuid.UUID, 0)
 	for _, node := range nodes {
@@ -624,7 +934,17 @@ func collectCommentIDs(nodes []*services.CommentNode) []uuid.UUID {
 	return ids
 }
 
-// toCommentNodeResponseWithLikes 转换评论树节点为响应格式（使用预查询的点赞状态）
+// toCommentNodeResponseWithLikes 转换评论树节点为响应格式。
+//
+// 使用预查询的点赞状态映射，递归转换整个评论树。
+// 这种方式避免了 N+1 查询问题，提高性能。
+//
+// 参数：
+//   - node: 评论树节点
+//   - likesMap: 预查询的点赞状态映射（评论 ID -> 是否点赞）
+//
+// 返回值：
+//   - *CommentNodeResponse: 评论树节点响应结构
 func toCommentNodeResponseWithLikes(node *services.CommentNode, likesMap map[uuid.UUID]bool) *CommentNodeResponse {
 	resp := &CommentNodeResponse{
 		Comment:  toCommentNodeCommentResponse(node.Comment),
@@ -640,7 +960,21 @@ func toCommentNodeResponseWithLikes(node *services.CommentNode, likesMap map[uui
 	return resp
 }
 
-// sendCommentNotification 发送评论通知（异步）
+// sendCommentNotification 发送评论通知（异步）。
+//
+// 在后台异步发送评论通知：
+//   - 回复评论时：通知被回复的用户
+//   - 顶层评论时：通知文章作者
+//
+// 该方法在 goroutine 中执行，不阻塞主请求。
+// 如果未配置通知服务，则直接返回不做任何处理。
+//
+// 参数：
+//   - ctx: 上下文（未使用，保留用于未来扩展）
+//   - c: 新创建的评论
+//   - postID: 文章 ID
+//   - parentID: 父评论 ID（回复时有效）
+//   - commentUserID: 评论者 ID
 func (h *CommentHandler) sendCommentNotification(ctx context.Context, c *comment.Comment, postID uuid.UUID, parentID *uuid.UUID, commentUserID uuid.UUID) {
 	// 如果没有通知服务，跳过
 	if h.notificationService == nil {

@@ -1,3 +1,20 @@
+// Package middleware 提供了 Cadmus HTTP 中间件实现。
+//
+// 该文件包含基于 Redis 的限流器实现，包括：
+//   - 滑动窗口限流算法
+//   - IP 和用户级别的限流策略
+//   - 预定义的限流配置
+//
+// 主要用途：
+//
+//	防止 API 滥用，保护系统免受恶意请求攻击。
+//
+// 注意事项：
+//   - 需要 Redis 服务支持
+//   - 采用 fail-open 策略（Redis 故障时允许请求通过）
+//   - 通过 HTTP 响应头返回限流状态
+//
+// 作者：xfy
 package middleware
 
 import (
@@ -9,14 +26,30 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RateLimiter 基于 Redis 滑动窗口的限流器
+// RateLimiter 基于 Redis 滑动窗口的限流器。
+//
+// 使用 Redis ZSET 实现滑动窗口限流算法，
+// 支持分布式环境下的统一限流。
 type RateLimiter struct {
+	// client Redis 客户端
 	client *redis.Client
-	limit  int           // 窗口内允许的最大请求数
-	window time.Duration // 滑动窗口时长
+
+	// limit 窗口内允许的最大请求数
+	limit int
+
+	// window 滑动窗口时长
+	window time.Duration
 }
 
-// NewRateLimiter 创建限流器
+// NewRateLimiter 创建限流器。
+//
+// 参数：
+//   - client: Redis 客户端
+//   - limit: 窗口内允许的最大请求数
+//   - window: 滑动窗口时长
+//
+// 返回值：
+//   - *RateLimiter: 新创建的限流器实例
 func NewRateLimiter(client *redis.Client, limit int, window time.Duration) *RateLimiter {
 	return &RateLimiter{
 		client: client,
@@ -25,11 +58,22 @@ func NewRateLimiter(client *redis.Client, limit int, window time.Duration) *Rate
 	}
 }
 
-// Allow 检查是否允许请求（滑动窗口算法）
+// Allow 检查是否允许请求（滑动窗口算法）。
+//
 // 使用 Redis ZSET 实现滑动窗口：
-// 1. 以时间戳为 score，请求 ID 为 member
-// 2. 清除窗口外的旧记录
-// 3. 检查当前窗口内的记录数是否超过限制
+//  1. 以时间戳为 score，请求 ID 为 member
+//  2. 清除窗口外的旧记录
+//  3. 检查当前窗口内的记录数是否超过限制
+//
+// 参数：
+//   - ctx: 上下文
+//   - key: 限流键名（通常包含 IP 或用户 ID）
+//
+// 返回值：
+//   - bool: true 表示允许请求，false 表示被限流
+//
+// 注意：
+//   - Redis 错误时返回 true（fail-open 策略）
 func (rl *RateLimiter) Allow(ctx context.Context, key string) bool {
 	now := time.Now()
 	windowStart := now.Add(-rl.window)
@@ -77,7 +121,16 @@ func (rl *RateLimiter) Allow(ctx context.Context, key string) bool {
 	return true
 }
 
-// Remaining 获取剩余可用请求次数
+// Remaining 获取剩余可用请求次数。
+//
+// 查询当前窗口内还可以发送的请求数量。
+//
+// 参数：
+//   - ctx: 上下文
+//   - key: 限流键名
+//
+// 返回值：
+//   - int: 剩余可用次数，最小为 0
 func (rl *RateLimiter) Remaining(ctx context.Context, key string) int {
 	now := time.Now()
 	windowStart := now.Add(-rl.window)
@@ -104,8 +157,22 @@ func (rl *RateLimiter) Remaining(ctx context.Context, key string) int {
 	return remaining
 }
 
-// RateLimitMiddleware 创建限流中间件
-// keyFunc 用于生成限流 key，通常基于 IP 或用户 ID
+// RateLimitMiddleware 创建限流中间件。
+//
+// 创建一个 HTTP 中间件，对请求进行限流控制。
+// 被限流时返回 429 状态码，并设置限流相关的响应头。
+//
+// 参数：
+//   - limiter: 限流器实例
+//   - keyFunc: 限流键生成函数，用于从请求中提取限流键
+//
+// 返回值：
+//   - 中间件函数
+//
+// 响应头：
+//   - X-RateLimit-Limit: 窗口内最大请求数
+//   - X-RateLimit-Remaining: 剩余可用次数
+//   - X-RateLimit-Reset: 窗口重置时间（Unix 时间戳）
 func RateLimitMiddleware(limiter *RateLimiter, keyFunc func(*http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +199,16 @@ func RateLimitMiddleware(limiter *RateLimiter, keyFunc func(*http.Request) strin
 	}
 }
 
-// IPKeyFunc 基于 IP 的限流 key 生成函数
+// IPKeyFunc 基于 IP 的限流键生成函数。
+//
+// 从请求中提取客户端 IP 地址，生成限流键。
+// 支持 X-Real-IP、X-Forwarded-For 和 RemoteAddr。
+//
+// 参数：
+//   - prefix: 键前缀，用于区分不同的限流场景
+//
+// 返回值：
+//   - 键生成函数
 func IPKeyFunc(prefix string) func(*http.Request) string {
 	return func(r *http.Request) string {
 		ip := r.Header.Get("X-Real-IP")
@@ -166,7 +242,17 @@ func IPKeyFunc(prefix string) func(*http.Request) string {
 	}
 }
 
-// UserKeyFunc 基于用户 ID 的限流 key 生成函数
+// UserKeyFunc 基于用户 ID 的限流键生成函数。
+//
+// 从请求中提取用户 ID，生成限流键。
+// 如果用户未认证，则回退到 IP 限流。
+//
+// 参数：
+//   - prefix: 键前缀
+//   - getUserID: 从请求中获取用户 ID 的函数
+//
+// 返回值：
+//   - 键生成函数
 func UserKeyFunc(prefix string, getUserID func(*http.Request) string) func(*http.Request) string {
 	return func(r *http.Request) string {
 		userID := getUserID(r)
@@ -178,20 +264,26 @@ func UserKeyFunc(prefix string, getUserID func(*http.Request) string) func(*http
 	}
 }
 
-// 预定义限流策略
+// 预定义限流策略。
 var (
 	// LoginLimit 登录限流：10 次/分钟
+	// 防止暴力破解攻击
 	LoginLimit = 10
+
 	// LoginWindow 登录窗口：1 分钟
 	LoginWindow = time.Minute
 
 	// PublicAPILimit 公开 API 限流：60 次/分钟
+	// 适用于无需认证的公开接口
 	PublicAPILimit = 60
+
 	// PublicAPIWindow 公开 API 窗口：1 分钟
 	PublicAPIWindow = time.Minute
 
 	// UserActionLimit 用户操作限流：100 次/分钟
+	// 适用于已认证用户的常规操作
 	UserActionLimit = 100
+
 	// UserActionWindow 用户操作窗口：1 分钟
 	UserActionWindow = time.Minute
 )

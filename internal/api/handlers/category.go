@@ -1,3 +1,19 @@
+// Package handlers 提供了 Cadmus API 的 HTTP 处理器实现。
+//
+// 该文件包含分类相关的核心逻辑，包括：
+//   - 分类的 CRUD 操作
+//   - 分类文章数量统计
+//   - 分类排序
+//
+// 主要用途：
+//
+//	用于管理博客文章的分类，支持层级分类结构。
+//
+// 注意事项：
+//   - 创建和更新分类需要管理员权限
+//   - 删除分类前需要检查是否有关联文章
+//
+// 作者：xfy
 package handlers
 
 import (
@@ -9,55 +25,109 @@ import (
 	"rua.plus/cadmus/internal/services"
 )
 
-// CategoryHandler 分类 API 处理器
+// CategoryHandler 分类 API 处理器。
+//
+// 该处理器负责处理所有分类相关的 HTTP 请求。
 type CategoryHandler struct {
+	// service 分类服务
 	service services.CategoryService
 }
 
-// NewCategoryHandler 创建分类处理器
+// NewCategoryHandler 创建分类处理器。
+//
+// 参数：
+//   - service: 分类服务
+//
+// 返回值：
+//   - *CategoryHandler: 新创建的分类处理器实例
 func NewCategoryHandler(service services.CategoryService) *CategoryHandler {
 	return &CategoryHandler{service: service}
 }
 
-// CreateCategoryRequest 创建分类请求
+// CreateCategoryRequest 创建分类请求结构体。
 type CreateCategoryRequest struct {
-	Name        string     `json:"name"`
-	Slug        string     `json:"slug"`
-	Description string     `json:"description,omitempty"`
-	ParentID    *uuid.UUID `json:"parent_id,omitempty"`
-	SortOrder   int        `json:"sort_order,omitempty"`
+	// Name 分类名称（必填）
+	Name string `json:"name"`
+
+	// Slug URL 别名（必填）
+	Slug string `json:"slug"`
+
+	// Description 分类描述（可选）
+	Description string `json:"description,omitempty"`
+
+	// ParentID 父分类 ID（可选，用于层级分类）
+	ParentID *uuid.UUID `json:"parent_id,omitempty"`
+
+	// SortOrder 排序顺序
+	SortOrder int `json:"sort_order,omitempty"`
 }
 
-// UpdateCategoryRequest 更新分类请求
+// UpdateCategoryRequest 更新分类请求结构体。
 type UpdateCategoryRequest struct {
-	Name        string     `json:"name"`
-	Slug        string     `json:"slug"`
-	Description string     `json:"description,omitempty"`
-	ParentID    *uuid.UUID `json:"parent_id,omitempty"`
-	SortOrder   int        `json:"sort_order,omitempty"`
+	// Name 分类名称
+	Name string `json:"name"`
+
+	// Slug URL 别名
+	Slug string `json:"slug"`
+
+	// Description 分类描述
+	Description string `json:"description,omitempty"`
+
+	// ParentID 父分类 ID
+	ParentID *uuid.UUID `json:"parent_id,omitempty"`
+
+	// SortOrder 排序顺序
+	SortOrder int `json:"sort_order,omitempty"`
 }
 
-// CategoryResponse 分类响应
+// CategoryResponse 分类响应结构体。
 type CategoryResponse struct {
-	ID          uuid.UUID  `json:"id"`
-	Name        string     `json:"name"`
-	Slug        string     `json:"slug"`
-	Description string     `json:"description,omitempty"`
-	ParentID    *uuid.UUID `json:"parent_id,omitempty"`
-	SortOrder   int        `json:"sort_order"`
-	PostCount   int        `json:"post_count,omitempty"`
-	CreatedAt   string     `json:"created_at"`
-	UpdatedAt   string     `json:"updated_at"`
+	// ID 分类唯一标识符
+	ID uuid.UUID `json:"id"`
+
+	// Name 分类名称
+	Name string `json:"name"`
+
+	// Slug URL 别名
+	Slug string `json:"slug"`
+
+	// Description 分类描述
+	Description string `json:"description,omitempty"`
+
+	// ParentID 父分类 ID
+	ParentID *uuid.UUID `json:"parent_id,omitempty"`
+
+	// SortOrder 排序顺序
+	SortOrder int `json:"sort_order"`
+
+	// PostCount 文章数量
+	PostCount int `json:"post_count,omitempty"`
+
+	// CreatedAt 创建时间
+	CreatedAt string `json:"created_at"`
+
+	// UpdatedAt 更新时间
+	UpdatedAt string `json:"updated_at"`
 }
 
-// CategoryListResponse 分类列表响应
+// CategoryListResponse 分类列表响应结构体。
 type CategoryListResponse struct {
+	// Categories 分类列表
 	Categories []CategoryResponse `json:"categories"`
-	Total      int                `json:"total"`
+
+	// Total 分类总数
+	Total int `json:"total"`
 }
 
-// List 分类列表
-// GET /api/v1/categories
+// List 分类列表。
+//
+// 获取所有分类列表，包含每个分类的文章数量。
+//
+// 路由：GET /api/v1/categories
+//
+// 返回值（通过响应体）：
+//   - categories: 分类列表
+//   - total: 分类总数
 func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -80,8 +150,21 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
-// Get 分类详情
-// GET /api/v1/categories/:slug
+// Get 分类详情。
+//
+// 根据 slug 获取分类的详细信息。
+//
+// 路由：GET /api/v1/categories/{slug}
+//
+// 参数：
+//   - slug: 分类 URL 别名（路径参数）
+//
+// 返回值（通过响应体）：
+//   - 分类详细信息
+//
+// 可能的错误：
+//   - VALIDATION_ERROR: 缺少分类标识
+//   - CATEGORY_NOT_FOUND: 分类不存在
 func (h *CategoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -102,8 +185,21 @@ func (h *CategoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, toCategoryResponse(category, count), http.StatusOK)
 }
 
-// Create 创建分类（需权限）
-// POST /api/v1/categories
+// Create 创建分类（需权限）。
+//
+// 创建新的分类。需要管理员权限。
+//
+// 路由：POST /api/v1/categories
+//
+// 参数（通过请求体）：
+//   - name: 分类名称（必填）
+//   - slug: URL 别名（必填）
+//   - description: 描述（可选）
+//   - parent_id: 父分类 ID（可选）
+//   - sort_order: 排序顺序
+//
+// 返回值（通过响应体）：
+//   - 新创建的分类信息
 func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -136,8 +232,18 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, toCategoryResponse(category, 0), http.StatusCreated)
 }
 
-// Update 更新分类
-// PUT /api/v1/categories/:id
+// Update 更新分类。
+//
+// 更新已有分类的信息。需要管理员权限。
+//
+// 路由：PUT /api/v1/categories/{id}
+//
+// 参数：
+//   - id: 分类 ID（路径参数）
+//   - 其他字段通过请求体传递
+//
+// 返回值（通过响应体）：
+//   - 更新后的分类信息
 func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -189,8 +295,23 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, toCategoryResponse(category, count), http.StatusOK)
 }
 
-// Delete 删除分类
-// DELETE /api/v1/categories/:id
+// Delete 删除分类。
+//
+// 删除指定的分类。需要管理员权限。
+// 如果分类下有文章，则无法删除。
+//
+// 路由：DELETE /api/v1/categories/{id}
+//
+// 参数：
+//   - id: 分类 ID（路径参数）
+//
+// 返回值（通过响应体）：
+//   - message: 删除成功提示
+//
+// 可能的错误：
+//   - VALIDATION_ERROR: 无效的分类 ID
+//   - CATEGORY_NOT_FOUND: 分类不存在
+//   - DELETE_FAILED: 分类下有文章，无法删除
 func (h *CategoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -220,7 +341,14 @@ func (h *CategoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "分类已删除"}, http.StatusOK)
 }
 
-// toCategoryResponse 转换 Category 到 CategoryResponse
+// toCategoryResponse 转换 Category 实体到 CategoryResponse 响应结构。
+//
+// 参数：
+//   - c: Category 实体指针
+//   - postCount: 文章数量
+//
+// 返回值：
+//   - CategoryResponse: 分类响应结构
 func toCategoryResponse(c *post.Category, postCount int) CategoryResponse {
 	return CategoryResponse{
 		ID:          c.ID,
