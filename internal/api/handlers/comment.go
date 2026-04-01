@@ -100,10 +100,19 @@ func (h *CommentHandler) GetByPost(w http.ResponseWriter, r *http.Request) {
 	// 尝试获取当前用户 ID（可选，用于显示点赞状态）
 	userID, _ := GetUserID(ctx)
 
+	// 收集所有评论 ID 用于批量查询点赞状态
+	commentIDs := collectCommentIDs(nodes)
+
+	// 批量查询点赞状态（避免 N+1）
+	likesMap := make(map[uuid.UUID]bool)
+	if userID != uuid.Nil && len(commentIDs) > 0 {
+		likesMap, _ = h.commentService.GetLikesBatch(ctx, commentIDs, userID)
+	}
+
 	// 转换为响应格式
 	responses := make([]*CommentNodeResponse, 0, len(nodes))
 	for _, node := range nodes {
-		responses = append(responses, toCommentNodeResponse(node, userID, h.commentService))
+		responses = append(responses, toCommentNodeResponseWithLikes(node, likesMap))
 	}
 
 	WriteJSON(w, CommentListResponse{
@@ -589,27 +598,6 @@ func toCommentResponse(c *comment.Comment) CommentResponse {
 	}
 }
 
-// toCommentNodeResponse 转换评论树节点为响应格式
-func toCommentNodeResponse(node *services.CommentNode, userID uuid.UUID, svc services.CommentService) *CommentNodeResponse {
-	resp := &CommentNodeResponse{
-		Comment:  toCommentNodeCommentResponse(node.Comment),
-		Children: make([]*CommentNodeResponse, 0, len(node.Children)),
-	}
-
-	// 如果用户已登录，检查点赞状态
-	if userID != uuid.Nil {
-		isLiked, _ := svc.IsLiked(context.Background(), node.Comment.ID, userID)
-		resp.IsLiked = isLiked
-	}
-
-	// 递归转换子评论
-	for _, child := range node.Children {
-		resp.Children = append(resp.Children, toCommentNodeResponse(child, userID, svc))
-	}
-
-	return resp
-}
-
 // toCommentNodeCommentResponse 转换 CommentNode 中的评论为响应格式（不含 isLiked）
 func toCommentNodeCommentResponse(c *comment.Comment) CommentResponse {
 	return CommentResponse{
@@ -624,6 +612,32 @@ func toCommentNodeCommentResponse(c *comment.Comment) CommentResponse {
 		CreatedAt: c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt: c.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
+}
+
+// collectCommentIDs 从评论树中收集所有评论 ID
+func collectCommentIDs(nodes []*services.CommentNode) []uuid.UUID {
+	ids := make([]uuid.UUID, 0)
+	for _, node := range nodes {
+		ids = append(ids, node.Comment.ID)
+		ids = append(ids, collectCommentIDs(node.Children)...)
+	}
+	return ids
+}
+
+// toCommentNodeResponseWithLikes 转换评论树节点为响应格式（使用预查询的点赞状态）
+func toCommentNodeResponseWithLikes(node *services.CommentNode, likesMap map[uuid.UUID]bool) *CommentNodeResponse {
+	resp := &CommentNodeResponse{
+		Comment:  toCommentNodeCommentResponse(node.Comment),
+		IsLiked:  likesMap[node.Comment.ID],
+		Children: make([]*CommentNodeResponse, 0, len(node.Children)),
+	}
+
+	// 递归转换子评论
+	for _, child := range node.Children {
+		resp.Children = append(resp.Children, toCommentNodeResponseWithLikes(child, likesMap))
+	}
+
+	return resp
 }
 
 // sendCommentNotification 发送评论通知（异步）

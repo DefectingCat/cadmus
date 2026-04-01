@@ -6,17 +6,17 @@ import (
 
 	"github.com/google/uuid"
 	"rua.plus/cadmus/internal/core/post"
-	"rua.plus/cadmus/internal/database"
+	"rua.plus/cadmus/internal/services"
 )
 
 // TagHandler 标签 API 处理器
 type TagHandler struct {
-	repo *database.TagRepository
+	service services.TagService
 }
 
 // NewTagHandler 创建标签处理器
-func NewTagHandler(repo *database.TagRepository) *TagHandler {
-	return &TagHandler{repo: repo}
+func NewTagHandler(service services.TagService) *TagHandler {
+	return &TagHandler{service: service}
 }
 
 // CreateTagRequest 创建标签请求
@@ -45,7 +45,7 @@ type TagListResponse struct {
 func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	tags, err := h.repo.GetAll(ctx)
+	tags, err := h.service.GetAll(ctx)
 	if err != nil {
 		WriteAPIError(w, "INTERNAL_ERROR", "获取标签列表失败", nil, http.StatusInternalServerError)
 		return
@@ -54,7 +54,7 @@ func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 	// 获取每个标签的文章数
 	responses := make([]TagResponse, 0, len(tags))
 	for _, t := range tags {
-		count, _ := h.repo.GetPostCount(ctx, t.ID)
+		count, _ := h.service.GetPostCount(ctx, t.ID)
 		responses = append(responses, toTagResponse(t, count))
 	}
 
@@ -76,13 +76,13 @@ func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := h.repo.GetBySlug(ctx, slug)
+	tag, err := h.service.GetBySlug(ctx, slug)
 	if err != nil {
 		WriteAPIError(w, "TAG_NOT_FOUND", "标签不存在", nil, http.StatusNotFound)
 		return
 	}
 
-	count, _ := h.repo.GetPostCount(ctx, tag.ID)
+	count, _ := h.service.GetPostCount(ctx, tag.ID)
 	WriteJSON(w, toTagResponse(tag, count), http.StatusOK)
 }
 
@@ -109,7 +109,7 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Slug: req.Slug,
 	}
 
-	if err := h.repo.Create(ctx, tag); err != nil {
+	if err := h.service.Create(ctx, tag); err != nil {
 		WriteAPIError(w, "INTERNAL_ERROR", "创建标签失败", []string{err.Error()}, http.StatusInternalServerError)
 		return
 	}
@@ -135,7 +135,7 @@ func (h *TagHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.repo.Delete(ctx, id); err != nil {
+	if err := h.service.Delete(ctx, id); err != nil {
 		if err == post.ErrTagNotFound {
 			WriteAPIError(w, "TAG_NOT_FOUND", "标签不存在", nil, http.StatusNotFound)
 			return

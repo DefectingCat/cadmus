@@ -6,17 +6,17 @@ import (
 
 	"github.com/google/uuid"
 	"rua.plus/cadmus/internal/core/post"
-	"rua.plus/cadmus/internal/database"
+	"rua.plus/cadmus/internal/services"
 )
 
 // CategoryHandler 分类 API 处理器
 type CategoryHandler struct {
-	repo *database.CategoryRepository
+	service services.CategoryService
 }
 
 // NewCategoryHandler 创建分类处理器
-func NewCategoryHandler(repo *database.CategoryRepository) *CategoryHandler {
-	return &CategoryHandler{repo: repo}
+func NewCategoryHandler(service services.CategoryService) *CategoryHandler {
+	return &CategoryHandler{service: service}
 }
 
 // CreateCategoryRequest 创建分类请求
@@ -61,7 +61,7 @@ type CategoryListResponse struct {
 func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	categories, err := h.repo.GetAll(ctx)
+	categories, err := h.service.GetAll(ctx)
 	if err != nil {
 		WriteAPIError(w, "INTERNAL_ERROR", "获取分类列表失败", nil, http.StatusInternalServerError)
 		return
@@ -70,7 +70,7 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	// 获取每个分类的文章数
 	responses := make([]CategoryResponse, 0, len(categories))
 	for _, c := range categories {
-		count, _ := h.repo.GetPostCount(ctx, c.ID)
+		count, _ := h.service.GetPostCount(ctx, c.ID)
 		responses = append(responses, toCategoryResponse(c, count))
 	}
 
@@ -92,13 +92,13 @@ func (h *CategoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	category, err := h.repo.GetBySlug(ctx, slug)
+	category, err := h.service.GetBySlug(ctx, slug)
 	if err != nil {
 		WriteAPIError(w, "CATEGORY_NOT_FOUND", "分类不存在", nil, http.StatusNotFound)
 		return
 	}
 
-	count, _ := h.repo.GetPostCount(ctx, category.ID)
+	count, _ := h.service.GetPostCount(ctx, category.ID)
 	WriteJSON(w, toCategoryResponse(category, count), http.StatusOK)
 }
 
@@ -128,7 +128,7 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SortOrder:   req.SortOrder,
 	}
 
-	if err := h.repo.Create(ctx, category); err != nil {
+	if err := h.service.Create(ctx, category); err != nil {
 		WriteAPIError(w, "INTERNAL_ERROR", "创建分类失败", []string{err.Error()}, http.StatusInternalServerError)
 		return
 	}
@@ -167,7 +167,7 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 获取现有分类
-	category, err := h.repo.GetByID(ctx, id)
+	category, err := h.service.GetByID(ctx, id)
 	if err != nil {
 		WriteAPIError(w, "CATEGORY_NOT_FOUND", "分类不存在", nil, http.StatusNotFound)
 		return
@@ -180,12 +180,12 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 	category.ParentID = req.ParentID
 	category.SortOrder = req.SortOrder
 
-	if err := h.repo.Update(ctx, category); err != nil {
+	if err := h.service.Update(ctx, category); err != nil {
 		WriteAPIError(w, "INTERNAL_ERROR", "更新分类失败", []string{err.Error()}, http.StatusInternalServerError)
 		return
 	}
 
-	count, _ := h.repo.GetPostCount(ctx, category.ID)
+	count, _ := h.service.GetPostCount(ctx, category.ID)
 	WriteJSON(w, toCategoryResponse(category, count), http.StatusOK)
 }
 
@@ -207,7 +207,7 @@ func (h *CategoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.repo.Delete(ctx, id); err != nil {
+	if err := h.service.Delete(ctx, id); err != nil {
 		if err == post.ErrCategoryNotFound {
 			WriteAPIError(w, "CATEGORY_NOT_FOUND", "分类不存在", nil, http.StatusNotFound)
 			return

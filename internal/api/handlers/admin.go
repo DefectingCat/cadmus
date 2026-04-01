@@ -340,10 +340,32 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 收集所有角色 ID 和用户 ID 用于批量查询
+	roleIDs := make([]uuid.UUID, 0, len(users))
+	userIDs := make([]uuid.UUID, 0, len(users))
+	for _, u := range users {
+		roleIDs = append(roleIDs, u.RoleID)
+		userIDs = append(userIDs, u.ID)
+	}
+
+	// 批量查询角色（避免 N+1）
+	rolesMap := make(map[uuid.UUID]*user.Role)
+	dbRoleRepo, ok := h.roleRepo.(*database.RoleRepository)
+	if ok && len(roleIDs) > 0 {
+		rolesMap, _ = dbRoleRepo.GetByIDs(ctx, roleIDs)
+	}
+
+	// 批量查询文章数（避免 N+1）
+	postCountsMap := make(map[uuid.UUID]int)
+	dbPostRepo, ok := h.postRepo.(*database.PostRepository)
+	if ok && len(userIDs) > 0 {
+		postCountsMap, _ = dbPostRepo.CountByAuthors(ctx, userIDs)
+	}
+
 	userInfos := make([]AdminUserInfo, 0, len(users))
 	for _, u := range users {
-		role, _ := h.roleRepo.GetByID(ctx, u.RoleID)
-		postCount, _ := h.getPostCount(ctx, u.ID)
+		role := rolesMap[u.RoleID]
+		postCount := postCountsMap[u.ID]
 		userInfos = append(userInfos, toAdminUserInfo(u, role, postCount))
 	}
 
