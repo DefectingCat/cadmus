@@ -1,0 +1,30 @@
+# PostgreSQL 18 开发服务器 Dockerfile
+# 基于 PostgreSQL 18.3 官方镜像（最新稳定版本）
+
+FROM postgres:18.3-bookworm
+
+# 维护者信息
+LABEL maintainer="xfy"
+LABEL description="Cadmus 项目开发数据库服务器"
+
+# 设置环境变量（可在运行时覆盖）
+ENV POSTGRES_DB=cadmus
+ENV POSTGRES_USER=cadmus
+ENV POSTGRES_PASSWORD=cadmus
+
+# 数据目录（容器内路径）
+# 运行时使用 -v ./data:/var/lib/postgresql/data 将数据存储到本地 data 目录
+ENV PGDATA=/var/lib/postgresql/data/pgdata
+
+# 暴露 PostgreSQL 默认端口
+EXPOSE 5432
+
+# 健康检查
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD pg_isready -U $POSTGRES_USER -d $POSTGRES_DB || exit 1
+
+# 数据持久化卷（容器内路径，运行时映射到本地 ./data 目录）
+VOLUME ["/var/lib/postgresql/data"]
+
+# 使用官方入口点
+# 官方镜像已包含 initdb 和启动脚本

@@ -70,6 +70,7 @@ secrets/
 
 # Database backups
 backups/
+data/
 
 # OMC internal
 .omc/
