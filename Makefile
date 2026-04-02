@@ -53,26 +53,9 @@ version:
 build/backend:
 	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/server ./cmd/server
 
-# Build frontend assets
+# Build frontend assets using package.json scripts
 build/frontend:
-	cd web/frontend && bun esbuild src/main.ts \
-		--bundle \
-		--outdir=../static/dist \
-		--minify \
-		--format=esm
-	cd web/frontend && bun esbuild src/admin/main.ts \
-		--bundle \
-		--outdir=../static/dist/admin \
-		--minify \
-		--format=esm
-	cd web/frontend && bunx @tailwindcss/cli \
-		-i src/styles/main.css \
-		-o ../static/dist/styles.css \
-		--minify
-	cd web/frontend && bunx @tailwindcss/cli \
-		-i src/styles/admin.css \
-		-o ../static/dist/admin.css \
-		--minify
+	cd web/frontend && bun run build:all
 
 # Generate templ files
 build/templ:
