@@ -35,9 +35,9 @@ import (
 //   - UserStatusBanned: 用户被封禁，无法登录
 //   - UserStatusPending: 用户待激活，需要完成激活流程
 const (
-	UserStatusActive  = user.StatusActive   // 正常状态
-	UserStatusBanned  = user.StatusBanned   // 封禁状态
-	UserStatusPending = user.StatusPending  // 待激活状态
+	UserStatusActive  = user.StatusActive  // 正常状态
+	UserStatusBanned  = user.StatusBanned  // 封禁状态
+	UserStatusPending = user.StatusPending // 待激活状态
 )
 
 // UserRepository 用户数据仓库接口（使用 user.User）
@@ -110,9 +110,9 @@ type UserRepository interface {
 //   - 通过 WithBlacklist 方法可以启用 token 黑名单功能
 //   - 黑名单功能需要 Redis 支持
 type AuthService struct {
-	jwtService *JWTService      // JWT 服务，用于 token 生成和验证
-	userRepo   UserRepository   // 用户数据仓库
-	blacklist  TokenBlacklist   // Token 黑名单（可选）
+	jwtService *JWTService    // JWT 服务，用于 token 生成和验证
+	userRepo   UserRepository // 用户数据仓库
+	blacklist  TokenBlacklist // Token 黑名单（可选）
 }
 
 // NewAuthService 创建新的认证服务实例。
@@ -128,8 +128,9 @@ type AuthService struct {
 //   - 返回初始化完成的 AuthService 实例
 //
 // 使用示例：
-//   jwtSvc := auth.NewJWTService(config)
-//   authSvc := auth.NewAuthService(jwtSvc, userRepo)
+//
+//	jwtSvc := auth.NewJWTService(config)
+//	authSvc := auth.NewAuthService(jwtSvc, userRepo)
 //
 // 注意事项：
 //   - 若需启用黑名单功能，需调用 WithBlacklist 方法
@@ -152,8 +153,9 @@ func NewAuthService(jwtService *JWTService, userRepo UserRepository) *AuthServic
 //   - 返回配置了黑名单的 AuthService 实例（支持链式调用）
 //
 // 使用示例：
-//   blacklist := auth.NewRedisTokenBlacklist(redisClient)
-//   authSvc := auth.NewAuthService(jwtSvc, userRepo).WithBlacklist(blacklist)
+//
+//	blacklist := auth.NewRedisTokenBlacklist(redisClient)
+//	authSvc := auth.NewAuthService(jwtSvc, userRepo).WithBlacklist(blacklist)
 //
 // 注意事项：
 //   - 黑名单功能会增加每次 token 验证时的 Redis 查询开销
@@ -167,8 +169,8 @@ func (s *AuthService) WithBlacklist(blacklist TokenBlacklist) *AuthService {
 //
 // 该结构用于封装登录成功后返回的数据，便于调用方获取完整认证信息。
 type LoginResult struct {
-	Token string        // JWT 认证 token，用于后续请求认证
-	User  *user.User    // 用户对象，包含用户详细信息
+	Token string     // JWT 认证 token，用于后续请求认证
+	User  *user.User // 用户对象，包含用户详细信息
 }
 
 // Login 用户登录认证。
@@ -184,16 +186,17 @@ type LoginResult struct {
 // 返回值：
 //   - result: 登录结果，包含 token 和用户信息
 //   - err: 可能的错误包括：
-//       - "invalid credentials": 邮箱或密码错误
-//       - "user is banned": 用户被封禁
-//       - token 生成失败的其他错误
+//   - "invalid credentials": 邮箱或密码错误
+//   - "user is banned": 用户被封禁
+//   - token 生成失败的其他错误
 //
 // 使用示例：
-//   result, err := authSvc.Login(ctx, "user@example.com", "password")
-//   if err != nil {
-//       // 处理登录失败
-//   }
-//   token := result.Token  // 用于后续认证
+//
+//	result, err := authSvc.Login(ctx, "user@example.com", "password")
+//	if err != nil {
+//	    // 处理登录失败
+//	}
+//	token := result.Token  // 用于后续认证
 //
 // 注意事项：
 //   - 密码验证使用 bcrypt，可抵御暴力破解
@@ -245,15 +248,16 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 // 返回值：
 //   - user: 创建成功的用户对象
 //   - err: 可能的错误包括：
-//       - "email already registered": 箱已被注册
-//       - "username already taken": 用户名已被使用
-//       - 密码哈希或数据库操作失败的其他错误
+//   - "email already registered": 箱已被注册
+//   - "username already taken": 用户名已被使用
+//   - 密码哈希或数据库操作失败的其他错误
 //
 // 使用示例：
-//   user, err := authSvc.Register(ctx, "newuser", "new@example.com", "password")
-//   if err != nil {
-//       // 处理注册失败
-//   }
+//
+//	user, err := authSvc.Register(ctx, "newuser", "new@example.com", "password")
+//	if err != nil {
+//	    // 处理注册失败
+//	}
 //
 // 注意事项：
 //   - 密码使用 bcrypt.DefaultCost 进行哈希，平衡安全性和性能
@@ -308,15 +312,16 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 //
 // 返回值：
 //   - err: 可能的错误包括：
-//       - token 解析失败
-//       - 黑名单写入失败
-//       - 若未配置黑名单，返回 nil（静默成功）
+//   - token 解析失败
+//   - 黑名单写入失败
+//   - 若未配置黑名单，返回 nil（静默成功）
 //
 // 使用示例：
-//   err := authSvc.Logout(ctx, tokenString)
-//   if err != nil {
-//       // 处理登出失败
-//   }
+//
+//	err := authSvc.Logout(ctx, tokenString)
+//	if err != nil {
+//	    // 处理登出失败
+//	}
 //
 // 注意事项：
 //   - 需先通过 WithBlacklist 配置黑名单，否则该方法无效果
@@ -358,9 +363,10 @@ func (s *AuthService) Logout(ctx context.Context, token string) error {
 //   - false: token 不在黑名单中，或未配置黑名单
 //
 // 使用示例：
-//   if authSvc.IsTokenBlacklisted(ctx, tokenString) {
-//       // 拒绝请求
-//   }
+//
+//	if authSvc.IsTokenBlacklisted(ctx, tokenString) {
+//	    // 拒绝请求
+//	}
 //
 // 注意事项：
 //   - 未配置黑名单时始终返回 false
@@ -399,17 +405,18 @@ func (s *AuthService) IsTokenBlacklisted(ctx context.Context, token string) bool
 //   - claims: token 中的声明信息，包含用户 ID 和角色 ID
 //   - user: 用户对象，包含完整用户信息
 //   - err: 可能的错误包括：
-//       - "token is blacklisted": token 已被注销
-//       - token 签名或格式无效
-//       - "user not found": 用户不存在
-//       - "user is banned": 用户被封禁
+//   - "token is blacklisted": token 已被注销
+//   - token 签名或格式无效
+//   - "user not found": 用户不存在
+//   - "user is banned": 用户被封禁
 //
 // 使用示例：
-//   claims, user, err := authSvc.ValidateToken(ctx, tokenString)
-//   if err != nil {
-//       // 处理验证失败，拒绝请求
-//   }
-//   // 使用 user.ID 和 user.RoleID 进行后续处理
+//
+//	claims, user, err := authSvc.ValidateToken(ctx, tokenString)
+//	if err != nil {
+//	    // 处理验证失败，拒绝请求
+//	}
+//	// 使用 user.ID 和 user.RoleID 进行后续处理
 //
 // 注意事项：
 //   - 该方法会检查用户状态，封禁用户即使 token 有效也会被拒绝

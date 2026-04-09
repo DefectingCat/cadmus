@@ -211,10 +211,11 @@ func (e *UserError) Is(target error) bool {
 //   - err: 加密失败时返回错误（通常为内存不足等极端情况）
 //
 // 使用示例：
-//   err := user.SetPassword("mySecurePassword123")
-//   if err != nil {
-//       return err
-//   }
+//
+//	err := user.SetPassword("mySecurePassword123")
+//	if err != nil {
+//	    return err
+//	}
 func (u *User) SetPassword(password string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -237,11 +238,12 @@ func (u *User) SetPassword(password string) error {
 //   - false: 密码不匹配
 //
 // 使用示例：
-//   if user.CheckPassword(inputPassword) {
-//       // 登录成功
-//   } else {
-//       // 密码错误
-//   }
+//
+//	if user.CheckPassword(inputPassword) {
+//	    // 登录成功
+//	} else {
+//	    // 密码错误
+//	}
 func (u *User) CheckPassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
 	return err == nil

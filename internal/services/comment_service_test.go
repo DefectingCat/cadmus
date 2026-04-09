@@ -205,7 +205,7 @@ func TestCommentService_GetCommentsByPost(t *testing.T) {
 		result, err := svc.GetCommentsByPost(context.Background(), postID)
 
 		assert.NoError(t, err)
-		assert.Len(t, result, 1) // One root node
+		assert.Len(t, result, 1)             // One root node
 		assert.Len(t, result[0].Children, 2) // Two children
 		mockCommentRepo.AssertExpectations(t)
 	})

@@ -5,8 +5,10 @@ package layouts
 
 //lint:file-ignore SA4006 This context is only used if a nested component is present.
 
-import "github.com/a-h/templ"
-import templruntime "github.com/a-h/templ/runtime"
+import (
+	"github.com/a-h/templ"
+	templruntime "github.com/a-h/templ/runtime"
+)
 
 // AdminLayout 后台管理布局模板 - Modern Elegant Design
 func AdminLayout(title string, currentPage string) templ.Component {

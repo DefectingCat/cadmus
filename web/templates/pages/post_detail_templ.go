@@ -5,14 +5,14 @@ package pages
 
 //lint:file-ignore SA4006 This context is only used if a nested component is present.
 
-import "github.com/a-h/templ"
-import templruntime "github.com/a-h/templ/runtime"
-
 import (
+	"strings"
+
+	"github.com/a-h/templ"
+	templruntime "github.com/a-h/templ/runtime"
 	"rua.plus/cadmus/internal/core/post"
 	"rua.plus/cadmus/internal/core/user"
 	"rua.plus/cadmus/web/templates/layouts"
-	"strings"
 )
 
 // PostDetailPage 文章详情页

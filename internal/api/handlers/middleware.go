@@ -54,7 +54,8 @@ const (
 //   - 中间件函数
 //
 // 使用示例：
-//   router.Use(AuthMiddleware(jwtService))
+//
+//	router.Use(AuthMiddleware(jwtService))
 func AuthMiddleware(jwtService *auth.JWTService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -258,9 +259,9 @@ func ExtractToken(r *http.Request) string {
 
 // APIError 统一的 API 错误响应格式
 type APIError struct {
-	Code      string   `json:"code"`       // "AUTH_FAILED", "VALIDATION_ERROR"
+	Code      string   `json:"code"` // "AUTH_FAILED", "VALIDATION_ERROR"
 	Message   string   `json:"message"`
-	Details   []string `json:"details"`    // 详细错误列表
+	Details   []string `json:"details"` // 详细错误列表
 	RequestID string   `json:"request_id"`
 }
 

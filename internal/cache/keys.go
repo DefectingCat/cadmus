@@ -80,8 +80,9 @@ const (
 //   - 格式化后的缓存键字符串
 //
 // 使用示例：
-//   key := BuildPostDetailKey("my-article", 1)
-//   // 返回: "cadmus:post:detail:my-article:v1"
+//
+//	key := BuildPostDetailKey("my-article", 1)
+//	// 返回: "cadmus:post:detail:my-article:v1"
 func BuildPostDetailKey(slug string, version int) string {
 	return fmt.Sprintf(PostDetailKey, slug, version)
 }
@@ -100,8 +101,9 @@ func BuildPostDetailKey(slug string, version int) string {
 //   - 格式化后的缓存键字符串
 //
 // 使用示例：
-//   key := BuildPostListKey("tech", 1, "created_at")
-//   // 返回: "cadmus:post:list:tech:1:created_at"
+//
+//	key := BuildPostListKey("tech", 1, "created_at")
+//	// 返回: "cadmus:post:list:tech:1:created_at"
 func BuildPostListKey(category string, page int, sort string) string {
 	return fmt.Sprintf(PostListKey, category, page, sort)
 }
@@ -118,7 +120,8 @@ func BuildPostListKey(category string, page int, sort string) string {
 //   - 格式化后的缓存键字符串
 //
 // 使用示例：
-//   key := BuildUserInfoKey("550e8400-e29b-41d4-a716-446655440000")
+//
+//	key := BuildUserInfoKey("550e8400-e29b-41d4-a716-446655440000")
 func BuildUserInfoKey(userID string) string {
 	return fmt.Sprintf(UserInfoKey, userID)
 }
@@ -136,7 +139,8 @@ func BuildUserInfoKey(userID string) string {
 //   - 格式化后的缓存键字符串
 //
 // 使用示例：
-//   key := BuildUserPermsKey("550e8400", "post.create")
+//
+//	key := BuildUserPermsKey("550e8400", "post.create")
 func BuildUserPermsKey(userID, permission string) string {
 	return fmt.Sprintf(UserPermsKey, userID, permission)
 }

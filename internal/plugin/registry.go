@@ -134,11 +134,12 @@ func RegisterPluginWithContext(ctor PluginConstructor, ctx *PluginContext) error
 //   - err: 插件不存在时返回错误
 //
 // 使用示例：
-//   p, err := plugin.GetPlugin("github-auth")
-//   if err != nil {
-//       log.Fatal(err)
-//   }
-//   info := p.Info()
+//
+//	p, err := plugin.GetPlugin("github-auth")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	info := p.Info()
 func GetPlugin(id string) (Plugin, error) {
 	mu.RLock()
 	defer mu.RUnlock()

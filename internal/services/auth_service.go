@@ -244,8 +244,8 @@ func (s *authServiceImpl) Login(ctx context.Context, email, password string) (st
 //
 // 返回值：
 //   - err: 可能的错误包括：
-//       - Token 无效
-//       - Token 无 jti 字段
+//   - Token 无效
+//   - Token 无 jti 字段
 //
 // 注意事项：
 //   - 未配置黑名单时静默返回 nil，不影响调用方
@@ -301,10 +301,10 @@ func (s *authServiceImpl) Refresh(token string) (string, error) {
 //   - claims: Token 中的声明信息
 //   - user: 用户对象
 //   - err: 可能的错误包括：
-//       - Token 无效或过期
-//       - Token 在黑名单中
-//       - 用户不存在
-//       - 用户已被封禁
+//   - Token 无效或过期
+//   - Token 在黑名单中
+//   - 用户不存在
+//   - 用户已被封禁
 //
 // 使用示例：
 //

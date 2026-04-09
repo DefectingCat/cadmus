@@ -169,20 +169,20 @@ func (e *MediaError) Is(target error) bool {
 // 包含常见图片类型、文档类型和压缩文件类型。
 var AllowedMimeTypes = map[string]bool{
 	// 图片类型
-	"image/jpeg": true,
-	"image/png":  true,
-	"image/gif":  true,
-	"image/webp": true,
+	"image/jpeg":    true,
+	"image/png":     true,
+	"image/gif":     true,
+	"image/webp":    true,
 	"image/svg+xml": true,
 
 	// 文档类型
-	"application/pdf": true,
+	"application/pdf":    true,
 	"application/msword": true,
 	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
 
 	// 其他类型
 	"application/zip": true,
-	"text/plain": true,
+	"text/plain":      true,
 }
 
 // IsImageMimeType 判断是否为图片 MIME 类型。
@@ -198,9 +198,10 @@ var AllowedMimeTypes = map[string]bool{
 //   - false: 不是图片类型
 //
 // 使用示例：
-//   if IsImageMimeType(file.Header.Get("Content-Type")) {
-//       // 提取图片尺寸
-//   }
+//
+//	if IsImageMimeType(file.Header.Get("Content-Type")) {
+//	    // 提取图片尺寸
+//	}
 func IsImageMimeType(mimeType string) bool {
 	return mimeType == "image/jpeg" ||
 		mimeType == "image/png" ||

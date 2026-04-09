@@ -115,9 +115,9 @@ func NewContainer(
 	authService := NewAuthService(userRepo, jwtService)
 
 	return &Container{
-		UserService:  userService,
-		AuthService:  authService,
-		jwtService:   jwtService,
+		UserService: userService,
+		AuthService: authService,
+		jwtService:  jwtService,
 	}
 }
 
@@ -148,9 +148,9 @@ func NewContainerWithBlacklist(
 	authService := NewAuthServiceWithBlacklist(userRepo, jwtService, blacklist)
 
 	return &Container{
-		UserService:  userService,
-		AuthService:  authService,
-		jwtService:   jwtService,
+		UserService: userService,
+		AuthService: authService,
+		jwtService:  jwtService,
 	}
 }
 
@@ -382,17 +382,17 @@ func NewContainerWithNotifications(
 	notificationService := NewNotificationService(notificationChannel)
 
 	return &Container{
-		UserService:        userService,
-		AuthService:        authService,
-		PostService:        postService,
-		CategoryService:    categoryService,
-		TagService:         tagService,
-		SeriesService:      seriesService,
-		CommentService:     commentService,
-		MediaService:       mediaService,
+		UserService:         userService,
+		AuthService:         authService,
+		PostService:         postService,
+		CategoryService:     categoryService,
+		TagService:          tagService,
+		SeriesService:       seriesService,
+		CommentService:      commentService,
+		MediaService:        mediaService,
 		NotificationService: notificationService,
-		RSSService:         rssService,
-		SearchService:      searchService,
-		jwtService:         jwtService,
+		RSSService:          rssService,
+		SearchService:       searchService,
+		jwtService:          jwtService,
 	}
 }

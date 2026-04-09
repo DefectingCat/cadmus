@@ -555,7 +555,6 @@ func (r *PostRepository) scanPostFromRow(row pgx.Rows) (*post.Post, error) {
 	return p, nil
 }
 
-
 // PostLikeRepository 文章点赞仓库实现。
 //
 // 包装 BaseLikeRepository 提供文章点赞功能，保持接口兼容。
@@ -608,6 +607,7 @@ func (r *PostLikeRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 	}
 	return likes, nil
 }
+
 // CountByAuthor 统计作者的文章数量
 func (r *PostRepository) CountByAuthor(ctx context.Context, authorID uuid.UUID) (int, error) {
 	query := `SELECT COUNT(*) FROM posts WHERE author_id = $1`

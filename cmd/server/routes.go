@@ -40,12 +40,13 @@ import (
 // 通过依赖注入方式传递，避免全局变量耦合。
 //
 // 使用示例：
-//   deps := &RouteDeps{
-//       AuthHandler: authHandler,
-//       PostHandler: postHandler,
-//       ...
-//   }
-//   setupRoutes(mux, deps)
+//
+//	deps := &RouteDeps{
+//	    AuthHandler: authHandler,
+//	    PostHandler: postHandler,
+//	    ...
+//	}
+//	setupRoutes(mux, deps)
 //
 // 注意事项：
 //   - 所有字段必须在使用前正确初始化
@@ -650,7 +651,8 @@ func setupStaticRoutes(mux *http.ServeMux, deps *RouteDeps) {
 //   - GET /health: 健康检查端点，返回 200 OK
 //
 // 返回格式：
-//   HTTP 200 状态码，响应体为 "OK"
+//
+//	HTTP 200 状态码，响应体为 "OK"
 //
 // 注意事项：
 //   - 该路由不检查数据库或缓存连接状态

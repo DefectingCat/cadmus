@@ -5,10 +5,9 @@ package admin
 
 //lint:file-ignore SA4006 This context is only used if a nested component is present.
 
-import "github.com/a-h/templ"
-import templruntime "github.com/a-h/templ/runtime"
-
 import (
+	"github.com/a-h/templ"
+	templruntime "github.com/a-h/templ/runtime"
 	"rua.plus/cadmus/internal/core/comment"
 	"rua.plus/cadmus/internal/core/post"
 	"rua.plus/cadmus/web/templates/layouts"

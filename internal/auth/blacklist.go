@@ -67,7 +67,7 @@ type TokenBlacklist interface {
 //   - 依赖 RedisClient 进行存储操作
 //   - 黑名单 key 使用统一前缀便于管理
 type RedisTokenBlacklist struct {
-	client *cache.RedisClient  // Redis 客户端，用于存储操作
+	client *cache.RedisClient // Redis 客户端，用于存储操作
 }
 
 // NewRedisTokenBlacklist 创建 Redis token 黑名单实例。
@@ -81,8 +81,9 @@ type RedisTokenBlacklist struct {
 //   - 返回初始化完成的 RedisTokenBlacklist 实例
 //
 // 使用示例：
-//   blacklist := auth.NewRedisTokenBlacklist(redisClient)
-//   authSvc := auth.NewAuthService(jwtSvc, userRepo).WithBlacklist(blacklist)
+//
+//	blacklist := auth.NewRedisTokenBlacklist(redisClient)
+//	authSvc := auth.NewAuthService(jwtSvc, userRepo).WithBlacklist(blacklist)
 //
 // 注意事项：
 //   - 确保 Redis 客户端已正确配置和连接
@@ -127,10 +128,11 @@ func buildBlacklistKey(tokenID string) string {
 //   - 若 token 已过期，返回 nil（无需加入黑名单）
 //
 // 使用示例：
-//   err := blacklist.AddToBlacklist(ctx, jti, claims.ExpiresAt.Time)
-//   if err != nil {
-//       // 处理写入失败
-//   }
+//
+//	err := blacklist.AddToBlacklist(ctx, jti, claims.ExpiresAt.Time)
+//	if err != nil {
+//	    // 处理写入失败
+//	}
 //
 // 注意事项：
 //   - TTL 基于 token 过期时间计算，自动清理
@@ -166,9 +168,10 @@ func (b *RedisTokenBlacklist) AddToBlacklist(ctx context.Context, tokenID string
 //   - false: token 不在黑名单中，可正常使用
 //
 // 使用示例：
-//   if blacklist.IsBlacklisted(ctx, jti) {
-//       // 拒绝请求，token 已被注销
-//   }
+//
+//	if blacklist.IsBlacklisted(ctx, jti) {
+//	    // 拒绝请求，token 已被注销
+//	}
 //
 // 注意事项：
 //   - 查询失败时返回 false，避免误拒绝有效请求

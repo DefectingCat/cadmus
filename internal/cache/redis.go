@@ -71,9 +71,10 @@ type Config struct {
 //   - config: 默认配置对象
 //
 // 使用示例：
-//   cfg := DefaultConfig()
-//   cfg.Host = "redis.example.com" // 自定义地址
-//   cfg.Password = "secret"        // 设置密码
+//
+//	cfg := DefaultConfig()
+//	cfg.Host = "redis.example.com" // 自定义地址
+//	cfg.Password = "secret"        // 设置密码
 func DefaultConfig() Config {
 	return Config{
 		Host:         "localhost",
@@ -148,11 +149,12 @@ type RedisClient struct {
 //   - err: 连接失败时返回错误
 //
 // 使用示例：
-//   client, err := NewRedisClient(DefaultConfig())
-//   if err != nil {
-//       log.Fatal("Redis 连接失败:", err)
-//   }
-//   defer client.Close()
+//
+//	client, err := NewRedisClient(DefaultConfig())
+//	if err != nil {
+//	    log.Fatal("Redis 连接失败:", err)
+//	}
+//	defer client.Close()
 func NewRedisClient(cfg Config) (*RedisClient, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:         cfg.Addr(),

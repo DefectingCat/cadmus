@@ -186,17 +186,17 @@ func (r *BaseLikeRepository) CountByTarget(ctx context.Context, targetID uuid.UU
 // PostLikeConfig 返回文章点赞配置。
 func PostLikeConfig() LikeConfig {
 	return LikeConfig{
-		TableName:     "post_likes",
-		TargetColumn:  "post_id",
-		CounterTable:  "posts",
+		TableName:    "post_likes",
+		TargetColumn: "post_id",
+		CounterTable: "posts",
 	}
 }
 
 // CommentLikeConfig 返回评论点赞配置。
 func CommentLikeConfig() LikeConfig {
 	return LikeConfig{
-		TableName:     "comment_likes",
-		TargetColumn:  "comment_id",
-		CounterTable:  "comments",
+		TableName:    "comment_likes",
+		TargetColumn: "comment_id",
+		CounterTable: "comments",
 	}
 }

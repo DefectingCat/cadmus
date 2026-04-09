@@ -103,8 +103,9 @@ type Service struct {
 //   - 缓存服务实例
 //
 // 使用示例：
-//   client, _ := NewRedisClient(DefaultConfig())
-//   svc := NewService(client)
+//
+//	client, _ := NewRedisClient(DefaultConfig())
+//	svc := NewService(client)
 func NewService(client *RedisClient) *Service {
 	return &Service{
 		client: client,
@@ -200,9 +201,10 @@ func (s *Service) SetNX(ctx context.Context, key string, value interface{}, ttl 
 //   - err: 数据不存在返回 ErrNotFound，其他错误原样返回
 //
 // 使用示例：
-//   data, err := svc.GetWithNullProtection(ctx, "user:123", func() (interface{}, error) {
-//       return db.GetUser(123)
-//   }, 5*time.Minute)
+//
+//	data, err := svc.GetWithNullProtection(ctx, "user:123", func() (interface{}, error) {
+//	    return db.GetUser(123)
+//	}, 5*time.Minute)
 func (s *Service) GetWithNullProtection(ctx context.Context, key string, fetchFn func() (interface{}, error), ttl time.Duration) (interface{}, error) {
 	// 步骤1: 尝试从缓存获取
 	result, err := s.Get(ctx, key)
@@ -254,9 +256,10 @@ func (s *Service) GetWithNullProtection(ctx context.Context, key string, fetchFn
 //   - err: 获取锁超时返回 ErrLockTimeout，其他错误原样返回
 //
 // 使用示例：
-//   data, err := svc.GetWithMutex(ctx, "hot:article:123", func() (interface{}, error) {
-//       return db.GetArticle(123)
-//   }, 10*time.Minute)
+//
+//	data, err := svc.GetWithMutex(ctx, "hot:article:123", func() (interface{}, error) {
+//	    return db.GetArticle(123)
+//	}, 10*time.Minute)
 func (s *Service) GetWithMutex(ctx context.Context, key string, fetchFn func() (interface{}, error), ttl time.Duration) (interface{}, error) {
 	// 步骤1: 尝试从缓存获取
 	result, err := s.Get(ctx, key)

@@ -124,7 +124,7 @@ PORT=3000 DB_HOST=localhost go run ./cmd/server
 ```
 
 ### Key Considerations
-- **环境变量优先级**: 所有配置项均支持环境变量覆盖，`.env` 文件需配合 `godotenv` 使用（当前未集成）
+- **环境变量优先级**: 所有配置项均支持环境变量覆盖。`.env` 文件已集成 godotenv/autoload，加载优先级：进程环境变量 > .env.local > .env > 代码默认值
 - **依赖初始化顺序**: Repository → Service → Handler，不可颠倒
 - **限流器依赖 Redis**: 确保 Redis 服务在服务器启动前可用
 - **JWT 配置必须**: JWT 密钥缺失会导致启动时 panic

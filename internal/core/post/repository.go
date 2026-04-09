@@ -308,16 +308,16 @@ type CategoryRepository interface {
 	GetChildren(ctx context.Context, parentID uuid.UUID) ([]*Category, error)
 
 	// GetRootCategories 获取顶级分类。
-//
-// 返回所有无父分类的顶级分类（ParentID 为空）。
-//
-// 参数：
-//   - ctx: 上下文
-//
-// 返回值：
-//   - categories: 顶级分类列表
-//   - err: 查询错误
-GetRootCategories(ctx context.Context) ([]*Category, error)
+	//
+	// 返回所有无父分类的顶级分类（ParentID 为空）。
+	//
+	// 参数：
+	//   - ctx: 上下文
+	//
+	// 返回值：
+	//   - categories: 顶级分类列表
+	//   - err: 查询错误
+	GetRootCategories(ctx context.Context) ([]*Category, error)
 
 	// GetPostCount 统计分类下文章数。
 	//

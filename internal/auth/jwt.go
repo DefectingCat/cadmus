@@ -36,9 +36,9 @@ import (
 //   - RoleID: 用户角色标识符，用于权限判断
 //   - RegisteredClaims: 标准 JWT 声明，包括过期时间、签发者等
 type Claims struct {
-	UserID uuid.UUID `json:"user_id"`  // 用户唯一标识符
-	RoleID uuid.UUID `json:"role_id"`  // 用户角色标识符
-	jwt.RegisteredClaims                 // 标准 JWT 声明
+	UserID               uuid.UUID `json:"user_id"` // 用户唯一标识符
+	RoleID               uuid.UUID `json:"role_id"` // 用户角色标识符
+	jwt.RegisteredClaims           // 标准 JWT 声明
 }
 
 // GetJWTID 获取 JWT ID（jti claim）。
@@ -50,10 +50,11 @@ type Claims struct {
 //   - 返回 jti 字符串，若未设置则返回空字符串
 //
 // 使用示例：
-//   jti := claims.GetJWTID()
-//   if jti != "" {
-//       // 使用 jti 进行黑名单操作
-//   }
+//
+//	jti := claims.GetJWTID()
+//	if jti != "" {
+//	    // 使用 jti 进行黑名单操作
+//	}
 func (c *Claims) GetJWTID() string {
 	if c.ID == "" {
 		return ""
@@ -70,7 +71,7 @@ func (c *Claims) GetJWTID() string {
 //   - 密钥必须保密，泄露将导致认证系统失效
 //   - 建议使用强密钥（至少 32 字符）并定期轮换
 type JWTService struct {
-	Config JWTConfig  // JWT 配置，包含密钥、过期时间等
+	Config JWTConfig // JWT 配置，包含密钥、过期时间等
 }
 
 // NewJWTService 创建新的 JWT 服务实例。
@@ -84,12 +85,13 @@ type JWTService struct {
 //   - 返回初始化完成的 JWTService 实例
 //
 // 使用示例：
-//   config := auth.JWTConfig{
-//       Secret: "your-secret-key",
-//       Expiry: 24 * time.Hour,
-//       Issuer: "cadmus",
-//   }
-//   jwtSvc := auth.NewJWTService(config)
+//
+//	config := auth.JWTConfig{
+//	    Secret: "your-secret-key",
+//	    Expiry: 24 * time.Hour,
+//	    Issuer: "cadmus",
+//	}
+//	jwtSvc := auth.NewJWTService(config)
 //
 // 注意事项：
 //   - 密钥长度建议至少 32 字符
@@ -113,11 +115,12 @@ func NewJWTService(config JWTConfig) *JWTService {
 //   - err: 生成失败时返回错误
 //
 // 使用示例：
-//   token, jti, err := jwtSvc.Generate(user.ID, user.RoleID)
-//   if err != nil {
-//       // 处理生成失败
-//   }
-//   // 存储 jti 用于后续追踪或黑名单操作
+//
+//	token, jti, err := jwtSvc.Generate(user.ID, user.RoleID)
+//	if err != nil {
+//	    // 处理生成失败
+//	}
+//	// 存储 jti 用于后续追踪或黑名单操作
 //
 // 注意事项：
 //   - Token 使用 HMAC-SHA256 签名
@@ -132,11 +135,11 @@ func (s *JWTService) Generate(userID, roleID uuid.UUID) (string, string, error) 
 		UserID: userID,
 		RoleID: roleID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        jti,                                    // 设置 jti claim
-			Issuer:    s.Config.Issuer,                        // 签发者标识
-			IssuedAt:  jwt.NewNumericDate(now),                // 签发时间
-			ExpiresAt: jwt.NewNumericDate(now.Add(s.Config.Expiry)),  // 过期时间
-			NotBefore: jwt.NewNumericDate(now),                // 生效时间
+			ID:        jti,                                          // 设置 jti claim
+			Issuer:    s.Config.Issuer,                              // 签发者标识
+			IssuedAt:  jwt.NewNumericDate(now),                      // 签发时间
+			ExpiresAt: jwt.NewNumericDate(now.Add(s.Config.Expiry)), // 过期时间
+			NotBefore: jwt.NewNumericDate(now),                      // 生效时间
 		},
 	}
 
@@ -158,16 +161,17 @@ func (s *JWTService) Generate(userID, roleID uuid.UUID) (string, string, error) 
 // 返回值：
 //   - claims: 解析后的声明信息，包含用户 ID 和角色 ID
 //   - err: 可能的错误包括：
-//       - "unexpected signing method": 签名算法不匹配
-//       - "invalid token claims": claims 解析失败
-//       - token 过期或格式无效
+//   - "unexpected signing method": 签名算法不匹配
+//   - "invalid token claims": claims 解析失败
+//   - token 过期或格式无效
 //
 // 使用示例：
-//   claims, err := jwtSvc.Validate(tokenString)
-//   if err != nil {
-//       // 处理验证失败
-//   }
-//   userID := claims.UserID  // 获取用户 ID
+//
+//	claims, err := jwtSvc.Validate(tokenString)
+//	if err != nil {
+//	    // 处理验证失败
+//	}
+//	userID := claims.UserID  // 获取用户 ID
 //
 // 注意事项：
 //   - 验证时会检查 token 是否过期
@@ -208,14 +212,15 @@ func (s *JWTService) Validate(tokenString string) (*Claims, error) {
 //   - tokenString: 新的 JWT token 字符串
 //   - jti: 新 token 的唯一标识符
 //   - err: 可能的错误包括：
-//       - 原 token 无效或格式错误
-//       - "token refresh window expired": 超出刷新时间窗口
+//   - 原 token 无效或格式错误
+//   - "token refresh window expired": 超出刷新时间窗口
 //
 // 使用示例：
-//   newToken, newJti, err := jwtSvc.Refresh(oldToken)
-//   if err != nil {
-//       // 处理刷新失败，可能需要重新登录
-//   }
+//
+//	newToken, newJti, err := jwtSvc.Refresh(oldToken)
+//	if err != nil {
+//	    // 处理刷新失败，可能需要重新登录
+//	}
 //
 // 注意事项：
 //   - 刷新后原 token 不会自动失效，建议配合黑名单机制

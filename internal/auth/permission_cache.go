@@ -38,11 +38,11 @@ import (
 const (
 	// PermissionCacheTTL 权限缓存过期时间。
 	// 设为 1 小时，平衡查询频率和数据一致性。
-	PermissionCacheTTL = 1 * time.Hour  // 权限缓存 TTL
+	PermissionCacheTTL = 1 * time.Hour // 权限缓存 TTL
 
 	// RoleCacheTTL 角色信息缓存过期时间。
 	// 设为 1 小时，角色权限变更频率通常较低。
-	RoleCacheTTL = 1 * time.Hour  // 角色信息缓存 TTL
+	RoleCacheTTL = 1 * time.Hour // 角色信息缓存 TTL
 )
 
 // PermissionCache 权限缓存服务，提供权限信息的缓存管理。
@@ -55,9 +55,9 @@ const (
 //   - 缓存失败不影响业务流程，降级到数据库查询
 //   - 权限变更后需调用失效方法清除缓存
 type PermissionCache struct {
-	cache    *cache.Service          // 缓存服务，用于存取操作
-	permRepo user.PermissionRepository  // 权限数据仓库，用于数据库查询
-	client   *redis.Client           // Redis 客户端，用于 SCAN 操作
+	cache    *cache.Service            // 缓存服务，用于存取操作
+	permRepo user.PermissionRepository // 权限数据仓库，用于数据库查询
+	client   *redis.Client             // Redis 客户端，用于 SCAN 操作
 }
 
 // NewPermissionCache 创建权限缓存服务实例。
@@ -74,8 +74,9 @@ type PermissionCache struct {
 //   - 返回初始化完成的 PermissionCache 实例
 //
 // 使用示例：
-//   permCache := auth.NewPermissionCache(cacheSvc, permRepo, redisClient)
-//   hasPerm, err := permCache.GetPermission(ctx, roleID, "user:read")
+//
+//	permCache := auth.NewPermissionCache(cacheSvc, permRepo, redisClient)
+//	hasPerm, err := permCache.GetPermission(ctx, roleID, "user:read")
 //
 // 注意事项：
 //   - 若不使用批量失效功能，redisClient 可为 nil
@@ -103,13 +104,14 @@ func NewPermissionCache(cacheService *cache.Service, permRepo user.PermissionRep
 //   - err: 可能的错误包括数据库查询失败
 //
 // 使用示例：
-//   hasPerm, err := permCache.GetPermission(ctx, roleID, "user:read")
-//   if err != nil {
-//       // 处理查询错误
-//   }
-//   if !hasPerm {
-//       // 拒绝操作
-//   }
+//
+//	hasPerm, err := permCache.GetPermission(ctx, roleID, "user:read")
+//	if err != nil {
+//	    // 处理查询错误
+//	}
+//	if !hasPerm {
+//	    // 拒绝操作
+//	}
 //
 // 注意事项：
 //   - 缓存命中时返回 true/false，不访问数据库
@@ -160,13 +162,14 @@ func (pc *PermissionCache) GetPermission(ctx context.Context, roleID uuid.UUID, 
 //   - err: 可能的错误包括数据库查询失败、JSON 反序列化失败
 //
 // 使用示例：
-//   perms, err := permCache.GetRolePermissions(ctx, roleID)
-//   if err != nil {
-//       // 处理错误
-//   }
-//   for _, perm := range perms {
-//       // 处理每个权限
-//   }
+//
+//	perms, err := permCache.GetRolePermissions(ctx, roleID)
+//	if err != nil {
+//	    // 处理错误
+//	}
+//	for _, perm := range perms {
+//	    // 处理每个权限
+//	}
 //
 // 注意事项：
 //   - 反序列化失败时会清除缓存并重新查询
@@ -219,10 +222,11 @@ func (pc *PermissionCache) GetRolePermissions(ctx context.Context, roleID uuid.U
 //   - err: 扫描或删除失败时返回错误
 //
 // 使用示例：
-//   err := permCache.InvalidateUserPermissions(ctx, userID)
-//   if err != nil {
-//       // 记录日志，但不影响业务
-//   }
+//
+//	err := permCache.InvalidateUserPermissions(ctx, userID)
+//	if err != nil {
+//	    // 记录日志，但不影响业务
+//	}
 //
 // 注意事项：
 //   - 需要 Redis 客户端支持 SCAN 操作
@@ -246,10 +250,11 @@ func (pc *PermissionCache) InvalidateUserPermissions(ctx context.Context, userID
 //   - err: 删除失败时返回错误
 //
 // 使用示例：
-//   err := permCache.InvalidateRolePermissions(ctx, roleID)
-//   if err != nil {
-//       // 记录日志
-//   }
+//
+//	err := permCache.InvalidateRolePermissions(ctx, roleID)
+//	if err != nil {
+//	    // 记录日志
+//	}
 //
 // 注意事项：
 //   - 同时删除角色权限列表和用户权限缓存
@@ -287,10 +292,11 @@ func (pc *PermissionCache) InvalidateRolePermissions(ctx context.Context, roleID
 //   - err: 扫描或删除失败时返回错误
 //
 // 使用示例：
-//   err := permCache.InvalidateAllPermissions(ctx)
-//   if err != nil {
-//       // 记录日志
-//   }
+//
+//	err := permCache.InvalidateAllPermissions(ctx)
+//	if err != nil {
+//	    // 记录日志
+//	}
 //
 // 注意事项：
 //   - 操作范围大，可能耗时较长
@@ -298,8 +304,8 @@ func (pc *PermissionCache) InvalidateRolePermissions(ctx context.Context, roleID
 func (pc *PermissionCache) InvalidateAllPermissions(ctx context.Context) error {
 	// 定义需要清理的缓存模式
 	patterns := []string{
-		"cadmus:user:perms:*",    // 所有用户权限缓存
-		"cadmus:role:perms:*",    // 所有角色权限缓存
+		"cadmus:user:perms:*", // 所有用户权限缓存
+		"cadmus:role:perms:*", // 所有角色权限缓存
 	}
 
 	// 遍历模式执行批量删除

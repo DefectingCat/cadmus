@@ -131,8 +131,9 @@ type FeedConfig struct {
 //   - config: 默认配置对象，包含预设的标题、链接等信息
 //
 // 使用示例：
-//   config := DefaultFeedConfig()
-//   config.Title = "我的博客" // 自定义标题
+//
+//	config := DefaultFeedConfig()
+//	config.Title = "我的博客" // 自定义标题
 func DefaultFeedConfig() FeedConfig {
 	return FeedConfig{
 		Title:       "Cadmus Blog",
@@ -156,7 +157,8 @@ func DefaultFeedConfig() FeedConfig {
 //   - 格式化后的时间字符串，空时间返回空字符串
 //
 // 使用示例：
-//   pubDate := FormatRFC822Time(post.CreatedAt)
+//
+//	pubDate := FormatRFC822Time(post.CreatedAt)
 func FormatRFC822Time(t time.Time) string {
 	if t.IsZero() {
 		return ""

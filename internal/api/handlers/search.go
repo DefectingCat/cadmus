@@ -88,10 +88,10 @@ func (h *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 	// 构建过滤条件
 	filters := search.SearchFilters{
-		Query:   query,
-		Status:  r.URL.Query().Get("status"),
+		Query:    query,
+		Status:   r.URL.Query().Get("status"),
 		Category: r.URL.Query().Get("category"),
-		Tag:     r.URL.Query().Get("tag"),
+		Tag:      r.URL.Query().Get("tag"),
 	}
 
 	// 解析作者 ID

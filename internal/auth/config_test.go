@@ -59,7 +59,7 @@ func TestDefaultJWTConfig(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, "cadmus", config.Issuer)
-		assert.Equal(t, 24*60*60*1000*1000*1000, int(config.Expiry)) // 24 hours in nanoseconds
+		assert.Equal(t, 24*60*60*1000*1000*1000, int(config.Expiry))          // 24 hours in nanoseconds
 		assert.Equal(t, 7*24*60*60*1000*1000*1000, int(config.RefreshExpiry)) // 7 days in nanoseconds
 	})
 }

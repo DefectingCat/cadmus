@@ -35,8 +35,9 @@ import (
 // 所有配置项均可通过环境变量覆盖默认值。
 //
 // 使用示例：
-//   cfg := loadConfig()
-//   pool, err := database.NewPool(ctx, cfg.Database)
+//
+//	cfg := loadConfig()
+//	pool, err := database.NewPool(ctx, cfg.Database)
 type Config struct {
 	// Database PostgreSQL 数据库连接配置
 	// 包含主机、端口、用户名、密码、连接池参数等
@@ -186,7 +187,8 @@ func loadJWTConfig() (auth.JWTConfig, error) {
 //   - string: 环境变量值或默认值
 //
 // 使用示例：
-//   port := getEnvOrDefault("PORT", "8080")
+//
+//	port := getEnvOrDefault("PORT", "8080")
 func getEnvOrDefault(key, defaultValue string) string {
 	value := os.Getenv(key)
 	if value == "" {
@@ -207,7 +209,8 @@ func getEnvOrDefault(key, defaultValue string) string {
 //   - int: 转换后的整数，若字符串无数字则返回 0
 //
 // 使用示例：
-//   port := atoi("5432") // 返回 5432
+//
+//	port := atoi("5432") // 返回 5432
 func atoi(s string) int {
 	var n int
 	for _, c := range s {
@@ -231,7 +234,8 @@ func atoi(s string) int {
 //   - error: 当前实现未返回实际错误，保留参数用于未来扩展
 //
 // 使用示例：
-//   page, err := parseIntStr("20")
+//
+//	page, err := parseIntStr("20")
 func parseIntStr(s string) (int, error) {
 	var n int
 	for _, c := range s {

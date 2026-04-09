@@ -198,10 +198,10 @@ func (s *userServiceImpl) Register(ctx context.Context, username, email, passwor
 	// 步骤5: 创建用户实体
 	// 新用户默认为 Pending 状态，需管理员审核后才能激活
 	newUser := &user.User{
-		ID:       uuid.New(),       // 生成唯一 UUID
+		ID:       uuid.New(), // 生成唯一 UUID
 		Username: username,
 		Email:    email,
-		RoleID:   defaultRole.ID,   // 关联默认角色
+		RoleID:   defaultRole.ID,     // 关联默认角色
 		Status:   user.StatusPending, // 待审核状态
 	}
 

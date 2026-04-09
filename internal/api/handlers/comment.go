@@ -85,10 +85,10 @@ func NewCommentHandlerWithNotifications(
 	userService services.UserService,
 ) *CommentHandler {
 	return &CommentHandler{
-		commentService:     commentService,
+		commentService:      commentService,
 		notificationService: notificationService,
-		postService:        postService,
-		userService:        userService,
+		postService:         postService,
+		userService:         userService,
 	}
 }
 

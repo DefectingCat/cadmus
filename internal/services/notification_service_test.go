@@ -129,8 +129,8 @@ func TestNotificationService_SendReplyNotification(t *testing.T) {
 		replierID := uuid.New()
 		p := &post.Post{ID: uuid.New(), Title: "Test Post", Slug: "test"}
 		parent := &comment.Comment{
-			ID:     uuid.New(),
-			UserID: parentAuthorID,
+			ID:      uuid.New(),
+			UserID:  parentAuthorID,
 			Content: "Original comment",
 		}
 		reply := &comment.Comment{

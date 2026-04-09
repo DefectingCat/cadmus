@@ -38,8 +38,9 @@ var (
 //   - ThemeRegistry: 主题注册表实例
 //
 // 使用示例：
-//   registry := theme.GetRegistry()
-//   themes := registry.All()
+//
+//	registry := theme.GetRegistry()
+//	themes := registry.All()
 func GetRegistry() ThemeRegistry {
 	once.Do(func() {
 		globalRegistry = NewThemeRegistry()
@@ -58,11 +59,12 @@ func GetRegistry() ThemeRegistry {
 //   - err: 注册失败时返回错误，如主题已存在
 //
 // 使用示例：
-//   func init() {
-//       if err := theme.Register(New()); err != nil {
-//           log.Printf("主题注册失败: %v", err)
-//       }
-//   }
+//
+//	func init() {
+//	    if err := theme.Register(New()); err != nil {
+//	        log.Printf("主题注册失败: %v", err)
+//	    }
+//	}
 func Register(theme Theme) error {
 	return GetRegistry().Register(theme)
 }
@@ -76,10 +78,11 @@ func Register(theme Theme) error {
 //   - err: 未设置激活主题时返回 ErrNoActiveTheme
 //
 // 使用示例：
-//   active, err := theme.GetActive()
-//   if err != nil {
-//       // 使用默认主题
-//   }
+//
+//	active, err := theme.GetActive()
+//	if err != nil {
+//	    // 使用默认主题
+//	}
 func GetActive() (Theme, error) {
 	return GetRegistry().GetActive()
 }
@@ -95,9 +98,10 @@ func GetActive() (Theme, error) {
 //   - err: 主题不存在返回 ErrThemeNotFound
 //
 // 使用示例：
-//   if err := theme.SetActive("dark"); err != nil {
-//       log.Printf("切换主题失败: %v", err)
-//   }
+//
+//	if err := theme.SetActive("dark"); err != nil {
+//	    log.Printf("切换主题失败: %v", err)
+//	}
 func SetActive(themeID string) error {
 	return GetRegistry().SetActive(themeID)
 }
@@ -110,10 +114,11 @@ func SetActive(themeID string) error {
 //   - []Theme: 主题列表
 //
 // 使用示例：
-//   themes := theme.All()
-//   for _, t := range themes {
-//       fmt.Println(t.Name)
-//   }
+//
+//	themes := theme.All()
+//	for _, t := range themes {
+//	    fmt.Println(t.Name)
+//	}
 func All() []Theme {
 	return GetRegistry().All()
 }

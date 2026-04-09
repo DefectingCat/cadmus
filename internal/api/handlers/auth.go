@@ -63,7 +63,8 @@ type AuthHandler struct {
 //   - *AuthHandler: 新创建的认证处理器实例
 //
 // 使用示例：
-//   handler := NewAuthHandler(authSvc, userSvc, jwtSvc)
+//
+//	handler := NewAuthHandler(authSvc, userSvc, jwtSvc)
 func NewAuthHandler(authService services.AuthService, userService services.UserService, jwtService *auth.JWTService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
@@ -87,7 +88,8 @@ func NewAuthHandler(authService services.AuthService, userService services.UserS
 //   - *AuthHandler: 新创建的完整功能认证处理器实例
 //
 // 使用示例：
-//   handler := NewAuthHandlerWithServices(authSvc, userSvc, jwtSvc, roleRepo)
+//
+//	handler := NewAuthHandlerWithServices(authSvc, userSvc, jwtSvc, roleRepo)
 func NewAuthHandlerWithServices(authService services.AuthService, userService services.UserService, jwtService *auth.JWTService, roleRepo user.RoleRepository) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
@@ -182,9 +184,10 @@ type UserInfo struct {
 //   - INTERNAL_ERROR: 创建用户或生成令牌失败
 //
 // 使用示例：
-//   POST /api/v1/auth/register
-//   Body: {"username": "test", "email": "test@example.com", "password": "password123"}
-//   Response: {"token": "jwt...", "user": {...}}
+//
+//	POST /api/v1/auth/register
+//	Body: {"username": "test", "email": "test@example.com", "password": "password123"}
+//	Response: {"token": "jwt...", "user": {...}}
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -249,9 +252,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 //   - AUTH_FAILED: 凭证无效（邮箱或密码错误）
 //
 // 使用示例：
-//   POST /api/v1/auth/login
-//   Body: {"email": "test@example.com", "password": "password123"}
-//   Response: {"token": "jwt...", "user": {...}}
+//
+//	POST /api/v1/auth/login
+//	Body: {"email": "test@example.com", "password": "password123"}
+//	Response: {"token": "jwt...", "user": {...}}
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

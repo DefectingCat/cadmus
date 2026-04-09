@@ -52,15 +52,16 @@ type JWTConfig struct {
 // 返回值：
 //   - config: JWT 配置对象，包含有效配置值
 //   - err: 可能的错误包括：
-//       - "JWT_SECRET environment variable is required": 未设置环境变量
-//       - "JWT_SECRET must be at least 32 characters": 密钥长度不足
+//   - "JWT_SECRET environment variable is required": 未设置环境变量
+//   - "JWT_SECRET must be at least 32 characters": 密钥长度不足
 //
 // 使用示例：
-//   config, err := auth.DefaultJWTConfig()
-//   if err != nil {
-//       // 处理配置错误，可能需要终止程序
-//   }
-//   jwtSvc := auth.NewJWTService(config)
+//
+//	config, err := auth.DefaultJWTConfig()
+//	if err != nil {
+//	    // 处理配置错误，可能需要终止程序
+//	}
+//	jwtSvc := auth.NewJWTService(config)
 //
 // 注意事项：
 //   - 必须设置环境变量 JWT_SECRET
@@ -85,9 +86,9 @@ func DefaultJWTConfig() (JWTConfig, error) {
 	// 有效期 24 小时，刷新窗口 7 天，符合常见实践
 	return JWTConfig{
 		Secret:        secret,
-		Expiry:        24 * time.Hour,        // Token 有效期：24 小时
-		RefreshExpiry: 7 * 24 * time.Hour,    // 刷新窗口：7 天
-		Issuer:        "cadmus",              // 签发者标识
+		Expiry:        24 * time.Hour,     // Token 有效期：24 小时
+		RefreshExpiry: 7 * 24 * time.Hour, // 刷新窗口：7 天
+		Issuer:        "cadmus",           // 签发者标识
 	}, nil
 }
 
@@ -100,9 +101,10 @@ func DefaultJWTConfig() (JWTConfig, error) {
 //   - config: JWT 配置对象
 //
 // 使用示例：
-//   // 测试环境
-//   config := auth.MustJWTConfig()
-//   jwtSvc := auth.NewJWTService(config)
+//
+//	// 测试环境
+//	config := auth.MustJWTConfig()
+//	jwtSvc := auth.NewJWTService(config)
 //
 // 注意事项：
 //   - 仅用于测试或开发环境，生产环境应使用 DefaultJWTConfig

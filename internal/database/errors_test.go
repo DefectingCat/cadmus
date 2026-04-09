@@ -10,10 +10,10 @@ import (
 
 func TestIsUniqueViolation(t *testing.T) {
 	tests := []struct {
-		name          string
-		err           error
+		name           string
+		err            error
 		constraintName string
-		expected      bool
+		expected       bool
 	}{
 		{
 			name: "correct error code and constraint name",

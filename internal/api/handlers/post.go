@@ -293,8 +293,8 @@ func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	// 解析筛选参数
 	filters := post.PostListFilters{
-		Status:   post.PostStatus(r.URL.Query().Get("status")),
-		Search:   r.URL.Query().Get("search"),
+		Status: post.PostStatus(r.URL.Query().Get("status")),
+		Search: r.URL.Query().Get("search"),
 	}
 
 	if authorID := r.URL.Query().Get("author_id"); authorID != "" {
@@ -915,15 +915,15 @@ func toPostResponse(p *post.Post) PostResponse {
 			Description: p.SEOMeta.Description,
 			Keywords:    p.SEOMeta.Keywords,
 		},
-		ViewCount:     p.ViewCount,
-		LikeCount:     p.LikeCount,
-		CommentCount:  p.CommentCount,
-		SeriesID:      p.SeriesID,
-		SeriesOrder:   p.SeriesOrder,
-		IsPaid:        p.IsPaid,
-		Price:         p.Price,
-		Version:       p.Version,
-		CreatedAt:     p.CreatedAt,
-		UpdatedAt:     p.UpdatedAt,
+		ViewCount:    p.ViewCount,
+		LikeCount:    p.LikeCount,
+		CommentCount: p.CommentCount,
+		SeriesID:     p.SeriesID,
+		SeriesOrder:  p.SeriesOrder,
+		IsPaid:       p.IsPaid,
+		Price:        p.Price,
+		Version:      p.Version,
+		CreatedAt:    p.CreatedAt,
+		UpdatedAt:    p.UpdatedAt,
 	}
 }

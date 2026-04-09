@@ -37,11 +37,11 @@ type MermaidBlockPlugin struct{}
 //   - PluginInfo: 包含插件 ID、名称、版本、作者、描述和依赖信息
 func (p *MermaidBlockPlugin) Info() plugin.PluginInfo {
 	return plugin.PluginInfo{
-		ID:          "mermaid-block",
-		Name:        "Mermaid 图表块",
-		Version:     "1.0.0",
-		Author:      "Cadmus Team",
-		Description: "支持文章内容中的 Mermaid 图表渲染，包括流程图、序列图、甘特图等",
+		ID:           "mermaid-block",
+		Name:         "Mermaid 图表块",
+		Version:      "1.0.0",
+		Author:       "Cadmus Team",
+		Description:  "支持文章内容中的 Mermaid 图表渲染，包括流程图、序列图、甘特图等",
 		Dependencies: []string{}, // 无依赖
 	}
 }
@@ -58,12 +58,13 @@ func (p *MermaidBlockPlugin) Info() plugin.PluginInfo {
 //   - error: 初始化失败时返回错误，当前始终返回 nil
 //
 // TODO:
-//   当 BlockTypeRegistry 实现后，注册自定义块类型：
 //
-//	if ctx.Registry != nil {
-//	    registry := ctx.Registry.(plugin.BlockTypeRegistry)
-//	    registry.Register("mermaid", &MermaidBlockType{})
-//	}
+//	  当 BlockTypeRegistry 实现后，注册自定义块类型：
+//
+//		if ctx.Registry != nil {
+//		    registry := ctx.Registry.(plugin.BlockTypeRegistry)
+//		    registry.Register("mermaid", &MermaidBlockType{})
+//		}
 func (p *MermaidBlockPlugin) Init(ctx *plugin.PluginContext) error {
 	logger.Info("[mermaid-block] Plugin initialized with context")
 

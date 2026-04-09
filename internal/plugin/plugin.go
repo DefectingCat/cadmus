@@ -60,8 +60,9 @@ import (
 //   - Init(): 初始化插件，接收运行时上下文
 //
 // 设计说明：
-//   使用构造函数模式（PluginConstructor）而非直接实例化，
-//   便于在注册时验证元信息，在初始化时注入依赖。
+//
+//	使用构造函数模式（PluginConstructor）而非直接实例化，
+//	便于在注册时验证元信息，在初始化时注入依赖。
 type Plugin interface {
 	// Info 返回插件元信息。
 	//
@@ -154,7 +155,8 @@ type PluginContext struct {
 // 便于在注册时延迟实例化，支持依赖检查后再创建实例。
 //
 // 使用示例：
-//   plugin.RegisterPlugin(func() plugin.Plugin {
-//       return &MyPlugin{}
-//   })
+//
+//	plugin.RegisterPlugin(func() plugin.Plugin {
+//	    return &MyPlugin{}
+//	})
 type PluginConstructor func() Plugin
