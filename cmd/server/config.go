@@ -100,25 +100,26 @@ type UploadConfig struct {
 //
 // 返回值：
 //   - *Config: 完整的应用配置对象，包含数据库、Redis、JWT、服务器和上传配置
+//   - error: 配置加载错误，当必要环境变量缺失时返回
 //
 // 注意事项：
-//   - JWT 配置加载失败会导致 panic
 //   - 数据库连接池参数已针对生产环境预设优化值
 //   - Redis 连接池参数已针对高频访问场景优化
+//   - JWT_SECRET 环境变量必须设置且至少 32 字符
 //
 // 环境变量列表：
 //   - PORT: 服务器端口（默认 "8080"）
 //   - DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_SSLMODE: 数据库配置
 //   - REDIS_HOST, REDIS_PORT, REDIS_PASSWORD: Redis 配置
 //   - UPLOAD_DIR, BASE_URL: 上传配置
-func loadConfig() *Config {
+//   - JWT_SECRET: JWT 签名密钥（必须设置，至少 32 字符）
+func loadConfig() (*Config, error) {
 	port := getEnvOrDefault("PORT", "8080")
 
 	// JWT 配置需要单独加载，因为可能失败
 	jwtCfg, err := loadJWTConfig()
 	if err != nil {
-		// 在调用方处理错误
-		panic("JWT config error: " + err.Error())
+		return nil, err
 	}
 
 	return &Config{
@@ -157,7 +158,7 @@ func loadConfig() *Config {
 			Dir:     getEnvOrDefault("UPLOAD_DIR", "./uploads"),
 			BaseURL: getEnvOrDefault("BASE_URL", "http://localhost:"+port),
 		},
-	}
+	}, nil
 }
 
 // loadJWTConfig 加载 JWT 认证配置。

@@ -110,7 +110,16 @@ func main() {
 	printVersionInfo()
 
 	// 加载配置
-	cfg := loadConfig()
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\n错误: %v\n\n", err)
+		fmt.Fprintln(os.Stderr, "请检查以下环境变量是否正确设置：")
+		fmt.Fprintln(os.Stderr, "  JWT_SECRET - JWT 签名密钥（必须至少 32 字符）")
+		fmt.Fprintln(os.Stderr, "\n示例:")
+		fmt.Fprintln(os.Stderr, "  export JWT_SECRET='your-secret-key-at-least-32-characters-long'")
+		fmt.Fprintln(os.Stderr, "\n或参考 .env.example 创建 .env 文件")
+		os.Exit(1)
+	}
 
 	// 初始化基础设施
 	ctx := context.Background()
