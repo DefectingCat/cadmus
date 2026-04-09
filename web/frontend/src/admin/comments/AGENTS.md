@@ -1,51 +1,68 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-04-01 | Updated: 2026-04-01 -->
+<!-- Generated: 2026-04-09 | Updated: 2026-04-09 -->
 
-# comments
+# 评论管理模块 - AI Agent 开发指南
 
-## Purpose
-评论管理模块，提供评论审核、批量操作功能。
+## 模块用途
 
-## Key Files
-| File | Description |
-|------|-------------|
-| `list.ts` | 评论列表：选择、批量操作、状态更新 |
+`comments` 目录是后台管理系统中的评论管理模块，负责处理用户评论的审核、批量操作和状态管理。
 
-## For AI Agents
+## 关键文件
 
-### Working In This Directory
-- 评论管理支持批量操作：批准、拒绝、删除
-- 使用确认对话框防止误操作
-- Toast 提示操作结果
+### list.ts
 
-### State Management
-```typescript
-const state = {
-  selectedIds: new Set<string>(),
-  currentStatus: 'pending',  // 当前筛选状态
-}
-```
+评论管理交互逻辑的核心文件。
 
-### Operations
+**主要功能：**
 
-| Action | Function | API Call |
-|--------|----------|----------|
-| 单个批准 | `handleSingleApprove` | `commentsApi.approveComment(id)` |
-| 单个拒绝 | `handleSingleReject` | `commentsApi.rejectComment(id)` |
-| 单个删除 | `handleSingleDelete` | `commentsApi.deleteComment(id)` |
-| 批量批准 | `handleConfirmAction('batch-approve')` | `commentsApi.batchApproveComments(ids)` |
-| 批量拒绝 | `handleConfirmAction('batch-reject')` | `commentsApi.batchRejectComments(ids)` |
-| 批量删除 | `handleConfirmAction('batch-delete')` | `commentsApi.batchDeleteComments(ids)` |
+- **状态管理**
+  - `selectedIds`: 选中的评论 ID 集合
+  - `currentStatus`: 当前筛选状态（pending/approved/rejected）
 
-### UI Components
-- 全选复选框 + 单行复选框
-- 批量操作工具栏（根据选择数量显示/隐藏）
-- 确认对话框（模态框）
-- Toast 提示
+- **DOM 元素引用**
+  - 全选复选框、批量操作按钮（批准/拒绝/删除）
+  - 确认对话框元素（标题、消息、确认/取消按钮）
+  - 已选择数量显示
 
-### Dependencies
+- **事件绑定**
+  - 全选/取消全选
+  - 单个评论复选框选择
+  - 批量操作按钮（批准/拒绝/删除）
+  - 单个评论操作按钮
+  - 对话框交互
 
-**Internal**:
-- `../../api/comments` - 评论 API 客户端
+- **批量操作**
+  - `toggleSelectAll()`: 切换全选状态
+  - `toggleAllCheckboxes()`: 切换所有复选框
+  - `updateBatchToolbar()`: 更新批量工具栏状态
+  - `showConfirmDialog()`: 显示确认对话框
+  - `handleConfirmAction()`: 处理确认操作（调用 API）
 
-<!-- MANUAL: -->
+- **单个操作**
+  - `handleSingleApprove()`: 批准单条评论
+  - `handleSingleReject()`: 拒绝单条评论
+  - `handleSingleDelete()`: 删除单条评论
+
+- **API 调用**
+  - 导入 `../../api/comments` 模块
+  - 调用 `approveComment`, `rejectComment`, `deleteComment`
+  - 调用 `batchApproveComments`, `batchRejectComments`, `batchDeleteComments`
+
+- **Toast 提示**
+  - `showSuccessToast()`: 成功提示
+  - `showErrorToast()`: 错误提示
+
+**开发注意事项：**
+
+1. 所有操作按钮通过 `data-id` 属性传递评论 ID
+2. 批量操作前显示确认对话框，防止误操作
+3. 操作完成后自动刷新页面以反映最新状态
+4. 错误处理通过 try-catch 捕获并显示 Toast 提示
+
+## 子目录
+
+无子目录。
+
+## 相关 API
+
+- `../../api/comments` - 评论相关 API 调用模块
