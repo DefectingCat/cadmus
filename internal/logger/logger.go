@@ -44,9 +44,19 @@ import (
 // 全局日志器实例。
 var (
 	// defaultLogger 默认日志器实例
-	// 在 Setup() 中初始化
+	// 在 Setup() 中初始化，或在 init 时使用默认配置
 	defaultLogger *log.Logger
 )
+
+// init 自动初始化默认日志器。
+//
+// 确保 logger 包在被导入时即可用，避免 init 函数顺序问题。
+// 使用默认 info 级别配置，Setup() 可覆盖此配置。
+func init() {
+	defaultLogger = log.New(os.Stderr)
+	defaultLogger.SetLevel(log.InfoLevel)
+	defaultLogger.SetReportTimestamp(true)
+}
 
 // Level 日志级别类型别名。
 //
