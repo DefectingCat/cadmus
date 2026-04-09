@@ -54,10 +54,11 @@ const (
 //   - 缓存命中时直接返回结果，不查询数据库
 //   - 缓存失败不影响业务流程，降级到数据库查询
 //   - 权限变更后需调用失效方法清除缓存
+//   - cache 为 nil 时降级为直接数据库查询
 type PermissionCache struct {
-	cache    *cache.Service            // 缓存服务，用于存取操作
+	cache    *cache.Service            // 缓存服务，用于存取操作。nil 时降级运行。
 	permRepo user.PermissionRepository // 权限数据仓库，用于数据库查询
-	client   *redis.Client             // Redis 客户端，用于 SCAN 操作
+	client   *redis.Client             // Redis 客户端，用于 SCAN 操作。nil 时禁用批量失效。
 }
 
 // NewPermissionCache 创建权限缓存服务实例。
@@ -118,6 +119,11 @@ func NewPermissionCache(cacheService *cache.Service, permRepo user.PermissionRep
 //   - 缓存写入失败不影响返回结果
 //   - 结果缓存 1 小时（PermissionCacheTTL）
 func (pc *PermissionCache) GetPermission(ctx context.Context, roleID uuid.UUID, permission string) (bool, error) {
+	// 降级模式：无缓存时直接查询数据库
+	if pc.cache == nil {
+		return pc.permRepo.CheckPermission(ctx, roleID, permission)
+	}
+
 	key := cache.BuildUserPermsKey(roleID.String(), permission)
 
 	// 步骤1: 尝试从缓存获取
@@ -173,6 +179,11 @@ func (pc *PermissionCache) GetPermission(ctx context.Context, roleID uuid.UUID, 
 //   - 反序列化失败时会清除缓存并重新查询
 //   - 空权限列表不会写入缓存
 func (pc *PermissionCache) GetRolePermissions(ctx context.Context, roleID uuid.UUID) ([]user.Permission, error) {
+	// 降级模式：无缓存时直接查询数据库
+	if pc.cache == nil {
+		return pc.permRepo.GetByRoleID(ctx, roleID)
+	}
+
 	key := cache.BuildRolePermsKey(roleID.String())
 
 	// 步骤1: 尝试从缓存获取

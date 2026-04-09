@@ -30,8 +30,11 @@ import (
 //
 // 使用 Redis ZSET 实现滑动窗口限流算法，
 // 支持分布式环境下的统一限流。
+//
+// 注意事项：
+//   - client 为 nil 时降级为允许所有请求
 type RateLimiter struct {
-	// client Redis 客户端
+	// client Redis 客户端。nil 时降级为允许所有请求。
 	client *redis.Client
 
 	// limit 窗口内允许的最大请求数
@@ -75,6 +78,11 @@ func NewRateLimiter(client *redis.Client, limit int, window time.Duration) *Rate
 // 注意：
 //   - Redis 错误时返回 true（fail-open 策略）
 func (rl *RateLimiter) Allow(ctx context.Context, key string) bool {
+	// 降级模式：无 Redis 客户端时允许所有请求
+	if rl.client == nil {
+		return true
+	}
+
 	now := time.Now()
 	windowStart := now.Add(-rl.window)
 
@@ -132,6 +140,11 @@ func (rl *RateLimiter) Allow(ctx context.Context, key string) bool {
 // 返回值：
 //   - int: 剩余可用次数，最小为 0
 func (rl *RateLimiter) Remaining(ctx context.Context, key string) int {
+	// 降级模式：无 Redis 客户端时返回最大限制
+	if rl.client == nil {
+		return rl.limit
+	}
+
 	now := time.Now()
 	windowStart := now.Add(-rl.window)
 

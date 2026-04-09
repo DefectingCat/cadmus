@@ -142,7 +142,7 @@ func loadConfig() (*Config, error) {
 			Password:     getEnvOrDefault("REDIS_PASSWORD", ""),
 			DB:           0,
 			PoolSize:     25,
-			MinIdleConns: 5,
+			MinIdleConns: 0, // 启动时不强制建立空闲连接，避免 Redis 不可用时的重试日志噪音
 			MaxRetries:   3,
 			DialTimeout:  5 * time.Second,
 			ReadTimeout:  3 * time.Second,

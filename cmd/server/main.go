@@ -30,6 +30,7 @@ import (
 	"time"
 
 	_ "github.com/joho/godotenv/autoload" // 自动加载 .env 文件（在所有 init() 之前执行）
+	"github.com/redis/go-redis/v9"
 
 	"rua.plus/cadmus/internal/api/handlers"
 	"rua.plus/cadmus/internal/api/middleware"
@@ -135,17 +136,23 @@ func main() {
 
 	redisClient, err := cache.NewRedisClient(cfg.Redis)
 	if err != nil {
-		logger.Fatalf("Failed to connect to Redis: %v", err)
+		logger.Printf("Redis connection failed: %v. Service will continue without cache.", err)
+		redisClient = nil // 降级模式：无缓存运行
+	} else {
+		defer func() {
+			if err := redisClient.Close(); err != nil {
+				logger.Printf("Failed to close Redis client: %v", err)
+			}
+		}()
+		logger.Println("Redis connection pool initialized")
 	}
-	defer func() {
-		if err := redisClient.Close(); err != nil {
-			logger.Printf("Failed to close Redis client: %v", err)
-		}
-	}()
-	logger.Println("Redis connection pool initialized")
 
-	cacheService := cache.NewService(redisClient)
-	logger.Println("Cache service initialized")
+	// 缓存服务：Redis 可用时使用，否则为 nil
+	var cacheService *cache.Service
+	if redisClient != nil {
+		cacheService = cache.NewService(redisClient)
+		logger.Println("Cache service initialized")
+	}
 
 	// 初始化 repositories
 	userRepo := database.NewUserRepository(pool)
@@ -171,16 +178,32 @@ func main() {
 
 	// 初始化 token 黑名单和权限缓存
 	tokenBlacklist := auth.NewRedisTokenBlacklist(redisClient)
-	logger.Println("Token blacklist initialized")
+	if redisClient != nil {
+		logger.Println("Token blacklist initialized")
+	} else {
+		logger.Println("Token blacklist disabled (no Redis)")
+	}
 
-	permCache := auth.NewPermissionCache(cacheService, permRepo, redisClient.Client())
-	logger.Println("Permission cache initialized")
+	var redisRawClient *redis.Client
+	if redisClient != nil {
+		redisRawClient = redisClient.Client()
+	}
+	permCache := auth.NewPermissionCache(cacheService, permRepo, redisRawClient)
+	if cacheService != nil {
+		logger.Println("Permission cache initialized")
+	} else {
+		logger.Println("Permission cache disabled (no Redis)")
+	}
 
 	// 初始化限流器
-	loginLimiter := middleware.NewRateLimiter(redisClient.Client(), middleware.LoginLimit, middleware.LoginWindow)
-	publicLimiter := middleware.NewRateLimiter(redisClient.Client(), middleware.PublicAPILimit, middleware.PublicAPIWindow)
-	userLimiter := middleware.NewRateLimiter(redisClient.Client(), middleware.UserActionLimit, middleware.UserActionWindow)
-	logger.Println("Rate limiters initialized")
+	loginLimiter := middleware.NewRateLimiter(redisRawClient, middleware.LoginLimit, middleware.LoginWindow)
+	publicLimiter := middleware.NewRateLimiter(redisRawClient, middleware.PublicAPILimit, middleware.PublicAPIWindow)
+	userLimiter := middleware.NewRateLimiter(redisRawClient, middleware.UserActionLimit, middleware.UserActionWindow)
+	if redisClient != nil {
+		logger.Println("Rate limiters initialized")
+	} else {
+		logger.Println("Rate limiters disabled (no Redis)")
+	}
 
 	// 初始化 Service 容器
 	serviceContainer := services.NewContainerWithMedia(

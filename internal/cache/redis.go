@@ -82,7 +82,7 @@ func DefaultConfig() Config {
 		Password:     "",
 		DB:           0,
 		PoolSize:     25,
-		MinIdleConns: 5,
+		MinIdleConns: 0, // 启动时不强制建立空闲连接，避免大量重试日志
 		MaxRetries:   3,
 		DialTimeout:  5 * time.Second,
 		ReadTimeout:  3 * time.Second,
@@ -172,6 +172,8 @@ func NewRedisClient(cfg Config) (*RedisClient, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := client.Ping(ctx).Err(); err != nil {
+		// 关闭客户端以停止后台连接池重连尝试
+		_ = client.Close() //nolint:errcheck // 关闭失败不影响业务
 		return nil, err
 	}
 

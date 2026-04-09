@@ -66,8 +66,9 @@ type TokenBlacklist interface {
 // 注意事项：
 //   - 依赖 RedisClient 进行存储操作
 //   - 黑名单 key 使用统一前缀便于管理
+//   - 若 client 为 nil，所有操作降级为无效果
 type RedisTokenBlacklist struct {
-	client *cache.RedisClient // Redis 客户端，用于存储操作
+	client *cache.RedisClient // Redis 客户端，用于存储操作。nil 时降级运行。
 }
 
 // NewRedisTokenBlacklist 创建 Redis token 黑名单实例。
@@ -75,7 +76,7 @@ type RedisTokenBlacklist struct {
 // 该函数初始化 RedisTokenBlacklist，绑定 Redis 客户端。
 //
 // 参数：
-//   - client: Redis 客户端实例，已配置好连接
+//   - client: Redis 客户端实例，已配置好连接。若为 nil 则降级运行。
 //
 // 返回值：
 //   - 返回初始化完成的 RedisTokenBlacklist 实例
@@ -86,8 +87,7 @@ type RedisTokenBlacklist struct {
 //	authSvc := auth.NewAuthService(jwtSvc, userRepo).WithBlacklist(blacklist)
 //
 // 注意事项：
-//   - 确保 Redis 客户端已正确配置和连接
-//   - Redis 服务应具备高可用性
+//   - nil 客户端时黑名单功能降级为无效
 func NewRedisTokenBlacklist(client *cache.RedisClient) *RedisTokenBlacklist {
 	return &RedisTokenBlacklist{client: client}
 }
@@ -138,6 +138,11 @@ func buildBlacklistKey(tokenID string) string {
 //   - TTL 基于 token 过期时间计算，自动清理
 //   - 已过期的 token 无需加入黑名单
 func (b *RedisTokenBlacklist) AddToBlacklist(ctx context.Context, tokenID string, expiry time.Time) error {
+	// 降级模式：无 Redis 客户端时直接返回
+	if b.client == nil {
+		return nil
+	}
+
 	key := buildBlacklistKey(tokenID)
 
 	// 计算 TTL：从当前时间到过期时间的剩余时长
@@ -177,6 +182,11 @@ func (b *RedisTokenBlacklist) AddToBlacklist(ctx context.Context, tokenID string
 //   - 查询失败时返回 false，避免误拒绝有效请求
 //   - 高频调用场景建议优化 Redis 连接池配置
 func (b *RedisTokenBlacklist) IsBlacklisted(ctx context.Context, tokenID string) bool {
+	// 降级模式：无 Redis 客户端时返回 false（允许请求）
+	if b.client == nil {
+		return false
+	}
+
 	key := buildBlacklistKey(tokenID)
 	result := b.client.Exists(ctx, key)
 	return result.Val() > 0
