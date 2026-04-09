@@ -29,6 +29,8 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/joho/godotenv/autoload" // 自动加载 .env 文件（在所有 init() 之前执行）
+
 	"rua.plus/cadmus/internal/api/handlers"
 	"rua.plus/cadmus/internal/api/middleware"
 	"rua.plus/cadmus/internal/auth"
@@ -71,13 +73,14 @@ var (
 // 确认当前运行版本。输出格式为多行文本，包含所有版本变量。
 //
 // 输出格式：
-//   Cadmus Blog Platform
-//     Version:    {version}
-//     Git Commit: {gitCommit}
-//     Git Branch: {gitBranch}
-//     Build Time: {buildTime}
-//     Go Version: {goVersion}
-//     Platform:   {buildPlatform}
+//
+//	Cadmus Blog Platform
+//	  Version:    {version}
+//	  Git Commit: {gitCommit}
+//	  Git Branch: {gitBranch}
+//	  Build Time: {buildTime}
+//	  Go Version: {goVersion}
+//	  Platform:   {buildPlatform}
 func printVersionInfo() {
 	fmt.Println("Cadmus Blog Platform")
 	fmt.Printf("  Version:    %s\n", version)
@@ -91,15 +94,15 @@ func printVersionInfo() {
 // main 是 Cadmus 博客平台的程序入口。
 //
 // 该函数负责协调所有组件的初始化和启动，执行以下步骤：
-//   1. 显示版本信息
-//   2. 加载配置（数据库、Redis、JWT、服务器等）
-//   3. 初始化基础设施（数据库连接池、Redis 客户端）
-//   4. 创建数据访问层（repositories）
-//   5. 初始化认证和安全组件（JWT、黑名单、权限缓存、限流器）
-//   6. 构建服务容器和处理器
-//   7. 配置 HTTP 路由
-//   8. 启动 HTTP 服务器
-//   9. 等待中断信号并优雅关闭
+//  1. 显示版本信息
+//  2. 加载配置（数据库、Redis、JWT、服务器等）
+//  3. 初始化基础设施（数据库连接池、Redis 客户端）
+//  4. 创建数据访问层（repositories）
+//  5. 初始化认证和安全组件（JWT、黑名单、权限缓存、限流器）
+//  6. 构建服务容器和处理器
+//  7. 配置 HTTP 路由
+//  8. 启动 HTTP 服务器
+//  9. 等待中断信号并优雅关闭
 //
 // 注意事项：
 //   - 数据库或 Redis 连接失败会导致程序退出
