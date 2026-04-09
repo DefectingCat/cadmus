@@ -58,6 +58,26 @@ test/coverage:
 test/bench:
 	go test -bench=. -benchmem ./...
 
+# 格式化代码（使用 goimports 替代 go fmt）
+fmt:
+	@echo "Formatting code with goimports..."
+	@if command -v goimports >/dev/null 2>&1; then \
+		goimports -w $(shell find . -path './data' -prune -o -name '*.go' -type f -print); \
+	else \
+		echo "goimports not installed. Run: go install golang.org/x/tools/cmd/goimports@latest"; \
+		exit 1; \
+	fi
+
+# 静态检查
+lint:
+	@echo "Running linter..."
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run ./cmd/... ./internal/... ./pkg/... ./plugins/... ./test/...; \
+	else \
+		echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+		go vet ./cmd/... ./internal/... ./pkg/... ./plugins/... ./test/...; \
+	fi
+
 # 显示版本信息
 version:
 	@echo "App: $(APP_NAME)"
