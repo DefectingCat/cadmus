@@ -1,44 +1,61 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-31 | Updated: 2026-03-31 -->
+<!-- Generated: 2026-04-09 | Updated: 2026-04-09 -->
 
-# migrations
+# 数据库迁移目录
 
-## Purpose
-PostgreSQL 数据库迁移脚本目录，管理数据库版本演进。
+## 用途
 
-## Key Files
-| File | Description |
-|------|-------------|
-| `001_init.up.sql` | 初始化：用户、角色、权限表 |
-| `001_init.down.sql` | 初始化回滚脚本 |
-| `002_create_posts.up.sql` | 文章、分类、标签、系列表 |
-| `003_create_comments.up.sql` | 评论、评论点赞表 |
-| `004_create_media.up.sql` | 媒体文件表 |
-| `004_create_post_likes.up.sql` | 文章点赞表 |
-| `README.md` | 迁移说明文档 |
+此目录存放 PostgreSQL 数据库迁移脚本，用于管理数据库结构的版本控制和演进。每个迁移文件包含向上迁移（`.up.sql`）和向下回滚（`.down.sql`）两个脚本。
 
-## For AI Agents
+## 迁移文件列表
 
-### Working In This Directory
-- 迁移文件命名格式：`{序号}_{描述}.up.sql` / `.down.sql`
-- 新增表需创建对应迁移文件
-- 迁移脚本需同时提供 up 和 down 版本
+| 编号 | 文件名 | 描述 |
+|------|--------|------|
+| 001 | `001_init` | 初始化数据库：启用 UUID 扩展、创建通用函数、权限系统（permissions/roles/role_permissions）、用户表（users）及默认角色 |
+| 002 | `002_create_posts` | 文章系统：分类（categories）、标签（tags）、文章系列（series）、文章表（posts）、文章标签关联（post_tags）、版本历史（post_versions）、全文搜索支持 |
+| 003 | `003_create_comments` | 评论系统：评论表（comments，支持嵌套回复）、评论点赞（comment_likes）、自动计算评论深度的触发器 |
+| 004 | `004_create_post_likes` | 文章点赞表（post_likes），记录用户对文章的点赞 |
+| 005 | `005_create_media` | 媒体库：媒体文件表（media），存储图片/文件等上传资源 |
 
-### Migration Order
-| Order | Tables Created |
-|-------|----------------|
-| 001 | users, roles, permissions, role_permissions, user_roles |
-| 002 | categories, tags, posts, post_tags, post_versions, series |
-| 003 | comments, comment_likes |
-| 004 | media, post_likes |
+## 子目录
 
-### Running Migrations
+无子目录，所有迁移文件均位于此目录。
+
+## AI Agent 迁移执行指南
+
+### 执行迁移
+
+使用 `psql` 按顺序执行 `.up.sql` 文件：
+
 ```bash
-# 使用 migrate 工具
-migrate -path ./migrations -database "postgres://cadmus:@localhost:5432/cadmus?sslmode=disable" up
+# 设置数据库连接
+export DATABASE_URL="postgresql://user:password@localhost:5432/cadmus"
 
-# 或使用 goose
-goose postgres "host=localhost port=5432 user=cadmus dbname=cadmus sslmode=disable" up
+# 按顺序执行迁移
+psql $DATABASE_URL -f migrations/001_init.up.sql
+psql $DATABASE_URL -f migrations/002_create_posts.up.sql
+psql $DATABASE_URL -f migrations/003_create_comments.up.sql
+psql $DATABASE_URL -f migrations/004_create_post_likes.up.sql
+psql $DATABASE_URL -f migrations/005_create_media.up.sql
 ```
 
-<!-- MANUAL: -->
+### 回滚迁移
+
+如需回滚，执行对应的 `.down.sql` 文件（从最新到最旧）：
+
+```bash
+psql $DATABASE_URL -f migrations/005_create_media.down.sql
+psql $DATABASE_URL -f migrations/004_create_post_likes.down.sql
+psql $DATABASE_URL -f migrations/003_create_comments.down.sql
+psql $DATABASE_URL -f migrations/002_create_posts.down.sql
+psql $DATABASE_URL -f migrations/001_init.down.sql
+```
+
+### 注意事项
+
+- 迁移必须按数字顺序执行（001 → 005）
+- 迁移 001 创建基础架构（UUID 扩展、函数、权限系统），必须先执行
+- 迁移 002 依赖 001（引用 users 表）
+- 迁移 003 依赖 002（引用 posts 表）
+- 迁移 004 依赖 002（引用 posts 表）
+- 迁移 005 依赖 001（引用 users 表）
