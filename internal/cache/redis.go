@@ -237,6 +237,8 @@ func (r *RedisClient) Set(ctx context.Context, key string, value interface{}, ex
 //
 // 返回值：
 //   - BoolCmd: 命令结果，true 表示设置成功
+//
+//nolint:staticcheck // SA1019 SetNX is deprecated in favor of Set with NX option, but we keep it for clarity
 func (r *RedisClient) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.BoolCmd {
 	return r.client.SetNX(ctx, key, value, expiration)
 }

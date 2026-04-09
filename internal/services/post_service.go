@@ -328,11 +328,15 @@ func (s *postServiceImpl) Update(ctx context.Context, p *post.Post, tagIDs []uui
 	tags, err := s.tagRepo.GetPostTags(ctx, p.ID)
 	if err == nil {
 		for _, t := range tags {
-			s.tagRepo.RemovePostTag(ctx, p.ID, t.ID)
+			if err := s.tagRepo.RemovePostTag(ctx, p.ID, t.ID); err != nil {
+				return err
+			}
 		}
 	}
 	for _, tagID := range tagIDs {
-		s.tagRepo.AddPostTag(ctx, p.ID, tagID)
+		if err := s.tagRepo.AddPostTag(ctx, p.ID, tagID); err != nil {
+			return err
+		}
 	}
 
 	return nil

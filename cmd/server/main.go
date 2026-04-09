@@ -137,7 +137,11 @@ func main() {
 	if err != nil {
 		logger.Fatalf("Failed to connect to Redis: %v", err)
 	}
-	defer redisClient.Close()
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			logger.Printf("Failed to close Redis client: %v", err)
+		}
+	}()
 	logger.Println("Redis connection pool initialized")
 
 	cacheService := cache.NewService(redisClient)
@@ -247,7 +251,9 @@ func main() {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(`<!DOCTYPE html><html><head><title>Cadmus - 博客平台</title></head><body><h1>Welcome to Cadmus</h1></body></html>`))
+		if _, err := w.Write([]byte(`<!DOCTYPE html><html><head><title>Cadmus - 博客平台</title></head><body><h1>Welcome to Cadmus</h1></body></html>`)); err != nil {
+			logger.Printf("Failed to write response: %v", err)
+		}
 	}))
 
 	// 创建 HTTP server

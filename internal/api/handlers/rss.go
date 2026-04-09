@@ -82,5 +82,5 @@ func (h *RSSHandler) Feed(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600") // 缓存 1 小时
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(xmlContent))
+	_, _ = w.Write([]byte(xmlContent))
 }

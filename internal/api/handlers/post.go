@@ -358,7 +358,7 @@ func (h *PostHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 增加浏览量
-	go h.postService.IncrementViewCount(ctx, p.ID)
+	go func() { _ = h.postService.IncrementViewCount(ctx, p.ID) }()
 
 	WriteJSON(w, toPostResponse(p), http.StatusOK)
 }

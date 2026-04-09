@@ -269,7 +269,7 @@ type APIError struct {
 func WriteAPIError(w http.ResponseWriter, code string, message string, details []string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(APIError{
+	_ = json.NewEncoder(w).Encode(APIError{
 		Code:      code,
 		Message:   message,
 		Details:   details,
@@ -281,7 +281,7 @@ func WriteAPIError(w http.ResponseWriter, code string, message string, details [
 func WriteJSON(w http.ResponseWriter, data any, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 // GetRequestID 获取请求 ID（用于追踪）

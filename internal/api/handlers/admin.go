@@ -339,7 +339,7 @@ func (h *AdminHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 
 	// 清除权限缓存
 	if h.permCache != nil {
-		h.permCache.InvalidateRolePermissions(ctx, roleID)
+		_ = h.permCache.InvalidateRolePermissions(ctx, roleID)
 	}
 
 	// 获取更新后的角色
@@ -590,7 +590,7 @@ func (h *AdminHandler) BanUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req BanUserRequest
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	// 切换封禁状态
 	if u.Status == user.StatusBanned {

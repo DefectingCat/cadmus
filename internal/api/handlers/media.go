@@ -134,7 +134,7 @@ func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		WriteAPIError(w, "BAD_REQUEST", "未找到上传文件", nil, http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// 获取可选的 alt_text
 	var altText *string

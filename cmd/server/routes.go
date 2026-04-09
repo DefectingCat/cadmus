@@ -29,6 +29,7 @@ import (
 	"rua.plus/cadmus/internal/core/comment"
 	"rua.plus/cadmus/internal/core/post"
 	"rua.plus/cadmus/internal/database"
+	"rua.plus/cadmus/internal/logger"
 	"rua.plus/cadmus/internal/services"
 	adminpages "rua.plus/cadmus/web/templates/pages/admin"
 )
@@ -661,6 +662,8 @@ func setupHealthRoute(mux *http.ServeMux, deps *RouteDeps) {
 	// 健康检查：返回简单的 OK 响应
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			logger.Printf("Failed to write health check response: %v", err)
+		}
 	})
 }

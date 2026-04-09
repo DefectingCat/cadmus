@@ -1010,7 +1010,7 @@ func (h *CommentHandler) sendCommentNotification(ctx context.Context, c *comment
 				return
 			}
 
-			h.notificationService.SendReplyNotification(bgCtx, c, parentComment, post, commentAuthor, parentAuthor)
+			_ = h.notificationService.SendReplyNotification(bgCtx, c, parentComment, post, commentAuthor, parentAuthor)
 		} else {
 			// 顶层评论：通知文章作者
 			postAuthor, err := h.userService.GetByID(bgCtx, post.AuthorID)
@@ -1018,7 +1018,7 @@ func (h *CommentHandler) sendCommentNotification(ctx context.Context, c *comment
 				return
 			}
 
-			h.notificationService.SendCommentNotification(bgCtx, c, post, postAuthor, commentAuthor)
+			_ = h.notificationService.SendCommentNotification(bgCtx, c, post, postAuthor, commentAuthor)
 		}
 	}()
 }

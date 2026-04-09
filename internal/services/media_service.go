@@ -118,7 +118,11 @@ func (s *mediaServiceImpl) Upload(ctx context.Context, userID uuid.UUID, file *m
 	if err != nil {
 		return nil, fmt.Errorf("failed to open uploaded file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			logger.Warn(fmt.Sprintf("failed to close uploaded file: %v", err))
+		}
+	}()
 
 	// 验证 MIME 类型
 	mimeType := file.Header.Get("Content-Type")
@@ -147,7 +151,11 @@ func (s *mediaServiceImpl) Upload(ctx context.Context, userID uuid.UUID, file *m
 	if err != nil {
 		return nil, fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer dst.Close()
+	defer func() {
+		if err := dst.Close(); err != nil {
+			logger.Warn(fmt.Sprintf("failed to close destination file: %v", err))
+		}
+	}()
 
 	// 复制文件内容
 	if _, err := io.Copy(dst, f); err != nil {
@@ -179,7 +187,9 @@ func (s *mediaServiceImpl) Upload(ctx context.Context, userID uuid.UUID, file *m
 	m, err := s.mediaRepo.Create(ctx, input, filename, filepath, url, width, height)
 	if err != nil {
 		// 删除已保存的文件
-		os.Remove(filepath)
+		if removeErr := os.Remove(filepath); removeErr != nil {
+			logger.Warn(fmt.Sprintf("failed to remove file %s: %v", filepath, removeErr))
+		}
 		return nil, err
 	}
 

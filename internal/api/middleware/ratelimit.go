@@ -184,7 +184,7 @@ func RateLimitMiddleware(limiter *RateLimiter, keyFunc func(*http.Request) strin
 				w.Header().Set("X-RateLimit-Remaining", "0")
 				w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(limiter.window).Unix()))
 				w.WriteHeader(http.StatusTooManyRequests)
-				w.Write([]byte(`{"code":"RATE_LIMIT_EXCEEDED","message":"请求过于频繁，请稍后再试","details":null}`))
+				_, _ = w.Write([]byte(`{"code":"RATE_LIMIT_EXCEEDED","message":"请求过于频繁，请稍后再试","details":null}`))
 				return
 			}
 

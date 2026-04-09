@@ -141,9 +141,7 @@ func (pc *PermissionCache) GetPermission(ctx context.Context, roleID uuid.UUID, 
 	if hasPerm {
 		cacheValue = "true"
 	}
-	if err := pc.cache.Set(ctx, key, cacheValue, PermissionCacheTTL); err != nil {
-		// 缓存失败不影响业务，生产环境应记录日志
-	}
+	_ = pc.cache.Set(ctx, key, cacheValue, PermissionCacheTTL) //nolint:errcheck // 缓存失败不影响业务
 
 	return hasPerm, nil
 }
@@ -184,7 +182,7 @@ func (pc *PermissionCache) GetRolePermissions(ctx context.Context, roleID uuid.U
 		var perms []user.Permission
 		if err := json.Unmarshal([]byte(result), &perms); err != nil {
 			// 反序列化失败，清除无效缓存并重新查询
-			pc.cache.Delete(ctx, key)
+			_ = pc.cache.Delete(ctx, key) //nolint:errcheck // 清除无效缓存，失败不影响后续逻辑
 		} else {
 			return perms, nil
 		}
@@ -202,7 +200,7 @@ func (pc *PermissionCache) GetRolePermissions(ctx context.Context, roleID uuid.U
 	if len(perms) > 0 {
 		data, err := json.Marshal(perms)
 		if err == nil {
-			pc.cache.Set(ctx, key, string(data), RoleCacheTTL)
+			_ = pc.cache.Set(ctx, key, string(data), RoleCacheTTL) //nolint:errcheck // 缓存失败不影响业务
 		}
 	}
 

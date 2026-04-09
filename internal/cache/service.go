@@ -279,7 +279,9 @@ func (s *Service) GetWithMutex(ctx context.Context, key string, fetchFn func() (
 
 	if acquired {
 		// 成功获取锁
-		defer s.Delete(ctx, lockKey)
+		defer func() {
+			_ = s.Delete(ctx, lockKey) //nolint:errcheck // 清理锁，失败不影响业务
+		}()
 
 		// 步骤3: 双重检查：再次尝试从缓存获取
 		result, err = s.Get(ctx, key)
